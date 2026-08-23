@@ -993,6 +993,64 @@ def admin():
 
 
 # =========================================================
+# MANAGE CITIZENS (admin) — view + delete citizen accounts
+# =========================================================
+
+@app.route("/admin/users")
+def admin_users():
+
+    if not session.get("admin_logged_in"):
+
+        return redirect(url_for("login"))
+
+    user_docs = (
+        db.collection("users")
+        .order_by("username")
+        .stream()
+    )
+
+    users = []
+
+    for doc in user_docs:
+
+        data = doc.to_dict()
+
+        data["id"] = doc.id
+
+        badge_icon, badge_name = get_badge(data.get("points", 0))
+
+        data["badge_icon"] = badge_icon
+
+        data["badge_name"] = badge_name
+
+        users.append(data)
+
+    return render_template("admin_users.html", users=users)
+
+
+@app.route("/admin/delete-user/<user_id>", methods=["POST"])
+def admin_delete_user(user_id):
+
+    if not session.get("admin_logged_in"):
+
+        return redirect(url_for("login"))
+
+    user_ref = db.collection("users").document(user_id)
+
+    if not user_ref.get().exists:
+
+        flash("That account no longer exists.")
+
+        return redirect(url_for("admin_users"))
+
+    user_ref.delete()
+
+    flash("🗑️ Citizen account deleted.")
+
+    return redirect(url_for("admin_users"))
+
+
+# =========================================================
 # UPDATE COMPLAINT STATUS
 # =========================================================
 
