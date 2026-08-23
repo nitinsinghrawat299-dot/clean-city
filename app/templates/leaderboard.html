@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>CleanCity Leaderboard</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+
+</head>
+
+
+<body>
+
+
+<nav>
+
+    <h2>🌱 CleanCity</h2>
+
+    <div>
+
+        <a href="/">
+            Report
+        </a>
+
+        <a href="/profile">
+            My Impact
+        </a>
+
+        <a href="/citizen-logout">
+            Logout
+        </a>
+
+    </div>
+
+</nav>
+
+
+<main>
+
+
+<section class="leaderboard">
+
+
+    <h1>
+        🏆 CleanCity Heroes
+    </h1>
+
+
+    <p>
+        Citizens with the most resolved reports.
+    </p>
+
+
+    {% for user in users %}
+
+
+    <div
+        class="
+            leaderboard-row
+            {% if user['username'] == session.get('citizen_username') %}
+            current-user
+            {% endif %}
+        "
+    >
+
+
+        <div class="rank">
+
+            {% if user["rank"] == 1 %}
+
+                🥇
+
+            {% elif user["rank"] == 2 %}
+
+                🥈
+
+            {% elif user["rank"] == 3 %}
+
+                🥉
+
+            {% else %}
+
+                #{{ user["rank"] }}
+
+            {% endif %}
+
+        </div>
+
+
+        <div class="leader-name">
+
+            <strong>
+                {{ user["icon"] }}
+                {{ user["username"] }}
+            </strong>
+
+
+            <small>
+                {{ user["badge"] }}
+            </small>
+
+        </div>
+
+
+        <div class="leader-points">
+
+            ⭐ {{ user["points"] }}
+
+        </div>
+
+
+    </div>
+
+
+    {% else %}
+
+
+    <div class="empty">
+
+        <h2>
+            🌱 No citizens yet
+        </h2>
+
+    </div>
+
+
+    {% endfor %}
+
+
+</section>
+
+
+</main>
+
+
+</body>
+
+</html>

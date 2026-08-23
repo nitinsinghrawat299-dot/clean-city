@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Join CleanCity</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+
+</head>
+
+
+<body>
+
+
+<nav>
+
+    <h2>🌱 CleanCity</h2>
+
+</nav>
+
+
+<main>
+
+
+<section class="card">
+
+
+    <h2>
+        🌱 Join CleanCity
+    </h2>
+
+
+    <p>
+        Create your account and start making your city cleaner.
+    </p>
+
+
+    <form method="POST">
+
+
+        <label>
+            Choose a username
+        </label>
+
+
+        <input
+            type="text"
+            name="username"
+            placeholder="Example: Rahul123"
+            required
+        >
+
+
+        <label>
+            Choose a password
+        </label>
+
+
+        <input
+            type="password"
+            name="password"
+            placeholder="At least 4 characters"
+            required
+        >
+
+
+        <button type="submit">
+            🌱 Create Account
+        </button>
+
+
+    </form>
+
+
+    <p class="center-text">
+
+        Already have an account?
+
+        <a href="/citizen-login">
+            Login
+        </a>
+
+    </p>
+
+
+</section>
+
+
+</main>
+
+
+</body>
+
+</html>

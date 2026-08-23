@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>My CleanCity Impact</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+
+</head>
+
+
+<body>
+
+
+<nav>
+
+    <h2>🌱 CleanCity</h2>
+
+    <div>
+
+        <a href="/">
+            Report
+        </a>
+
+        <a href="/leaderboard">
+            🏆 Leaderboard
+        </a>
+
+        <a href="/citizen-logout">
+            Logout
+        </a>
+
+    </div>
+
+</nav>
+
+
+<main>
+
+
+<section class="impact-card">
+
+
+    <h1>
+        {{ badge_icon }} {{ badge_name }}
+    </h1>
+
+
+    <h2>
+        {{ user["username"] }}
+    </h2>
+
+
+    <div class="points">
+
+        ⭐ {{ user["points"] }} Points
+
+    </div>
+
+
+    <div class="stats">
+
+
+        <div>
+
+            <strong>
+                {{ total }}
+            </strong>
+
+            <span>
+                Reports
+            </span>
+
+        </div>
+
+
+        <div>
+
+            <strong>
+                {{ resolved }}
+            </strong>
+
+            <span>
+                Resolved
+            </span>
+
+        </div>
+
+
+        <div>
+
+            <strong>
+                {{ user["points"] }}
+            </strong>
+
+            <span>
+                Points
+            </span>
+
+        </div>
+
+
+    </div>
+
+
+</section>
+
+
+<section class="complaints">
+
+
+    <h2>
+        📋 My Reports
+    </h2>
+
+
+    {% if complaints %}
+
+
+        {% for complaint in complaints %}
+
+
+        <div class="complaint-card">
+
+
+            <div class="complaint-header">
+
+                <h2>
+                    Report #{{ complaint["id"] }}
+                </h2>
+
+
+                <span class="status">
+                    {{ complaint["status"] }}
+                </span>
+
+            </div>
+
+
+            {% if complaint["image"] %}
+
+            <img
+                src="{{ complaint['image'] }}"
+                class="garbage-image"
+                alt="Garbage"
+            >
+
+            {% endif %}
+
+
+            <p>
+
+                📍
+
+                {{ complaint["address"] or complaint["location"] }}
+
+            </p>
+
+
+            {% if complaint["description"] %}
+
+            <p>
+
+                📝 {{ complaint["description"] }}
+
+            </p>
+
+            {% endif %}
+
+
+            {% if complaint["points_awarded"] > 0 %}
+
+            <p class="earned">
+
+                🎉 +{{ complaint["points_awarded"] }}
+                points earned!
+
+            </p>
+
+            {% endif %}
+
+
+            {% if complaint["status"] == "Denied" and complaint["denial_reason"] %}
+
+            <p class="denied-reason">
+
+                ⛔ <strong>Denied:</strong>
+                {{ complaint["denial_reason"] }}
+
+            </p>
+
+            {% endif %}
+
+
+        </div>
+
+
+        {% endfor %}
+
+
+    {% else %}
+
+
+        <div class="empty">
+
+            <h2>
+                🌱 No reports yet
+            </h2>
+
+            <p>
+                Find some garbage and help your city!
+            </p>
+
+        </div>
+
+
+    {% endif %}
+
+
+</section>
+
+
+</main>
+
+
+</body>
+
+</html>

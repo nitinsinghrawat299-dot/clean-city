@@ -1,0 +1,903 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+
+html {
+
+    -webkit-text-size-adjust: 100%;
+
+}
+
+
+body {
+
+    font-family: Arial, sans-serif;
+
+    background: #f1f7f3;
+
+    color: #222;
+
+    overflow-x: hidden;
+
+}
+
+
+img {
+
+    max-width: 100%;
+
+}
+
+
+button,
+input,
+select,
+textarea,
+.map-button,
+nav a {
+
+    /* Keeps tap targets comfortable on touch screens */
+
+    touch-action: manipulation;
+
+}
+
+
+nav {
+
+    background: #167a45;
+
+    color: white;
+
+    padding: 18px 7%;
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: center;
+
+    gap: 15px;
+
+}
+
+
+nav h2 {
+
+    font-size: 24px;
+
+}
+
+
+nav a {
+
+    color: white;
+
+    text-decoration: none;
+
+    margin-left: 15px;
+
+}
+
+
+main {
+
+    min-height: 90vh;
+
+    padding: 45px 20px;
+
+}
+
+
+.hero {
+
+    text-align: center;
+
+    max-width: 750px;
+
+    margin: auto;
+
+}
+
+
+.hero h1 {
+
+    font-size: 40px;
+
+    color: #126b3c;
+
+    margin-bottom: 12px;
+
+}
+
+
+.hero p {
+
+    color: #555;
+
+    font-size: 18px;
+
+}
+
+
+.card {
+
+    background: white;
+
+    max-width: 650px;
+
+    margin: 35px auto;
+
+    padding: 32px;
+
+    border-radius: 18px;
+
+    box-shadow:
+        0 5px 25px rgba(0,0,0,0.1);
+
+}
+
+
+.card h2 {
+
+    color: #126b3c;
+
+    margin-bottom: 20px;
+
+}
+
+
+form {
+
+    display: flex;
+
+    flex-direction: column;
+
+}
+
+
+label {
+
+    font-weight: bold;
+
+    margin-top: 15px;
+
+    margin-bottom: 7px;
+
+}
+
+
+.optional {
+
+    color: #888;
+
+    font-size: 13px;
+
+    font-weight: normal;
+
+}
+
+
+input,
+textarea,
+select {
+
+    padding: 13px;
+
+    border: 1px solid #ccc;
+
+    border-radius: 9px;
+
+    font-size: 15px;
+
+}
+
+
+textarea {
+
+    height: 90px;
+
+    resize: none;
+
+}
+
+
+button {
+
+    margin-top: 15px;
+
+    padding: 14px;
+
+    background: #167a45;
+
+    color: white;
+
+    border: none;
+
+    border-radius: 9px;
+
+    font-size: 16px;
+
+    cursor: pointer;
+
+}
+
+
+button:hover {
+
+    background: #0f5c33;
+
+}
+
+
+.location-status {
+
+    color: #126b3c;
+
+    margin: 10px 0;
+
+    font-size: 14px;
+
+}
+
+
+.report-map {
+
+    height: 350px;
+
+    width: 100%;
+
+    border-radius: 12px;
+
+    border: 2px solid #ddd;
+
+    overflow: hidden;
+
+}
+
+
+.location-button {
+
+    background: #126b3c;
+
+}
+
+
+.report-button {
+
+    font-size: 20px;
+
+    padding: 17px;
+
+    margin-top: 25px;
+
+}
+
+
+.flash {
+
+    max-width: 650px;
+
+    margin: 20px auto;
+
+    padding: 15px;
+
+    background: #dff5e7;
+
+    color: #126b3c;
+
+    border-radius: 10px;
+
+    text-align: center;
+
+    font-weight: bold;
+
+}
+
+
+.center-text {
+
+    text-align: center;
+
+    margin-top: 20px;
+
+}
+
+
+.center-text a {
+
+    color: #167a45;
+
+    font-weight: bold;
+
+}
+
+
+.impact-card {
+
+    max-width: 800px;
+
+    margin: auto;
+
+    text-align: center;
+
+    background: white;
+
+    padding: 40px;
+
+    border-radius: 20px;
+
+    box-shadow:
+        0 5px 25px rgba(0,0,0,0.1);
+
+}
+
+
+.impact-card h1 {
+
+    color: #126b3c;
+
+    margin-bottom: 10px;
+
+}
+
+
+.points {
+
+    font-size: 30px;
+
+    font-weight: bold;
+
+    margin: 25px;
+
+    color: #167a45;
+
+}
+
+
+.stats {
+
+    display: flex;
+
+    justify-content: center;
+
+    gap: 20px;
+
+}
+
+
+.stats div {
+
+    background: #f1f7f3;
+
+    padding: 20px;
+
+    border-radius: 12px;
+
+    min-width: 130px;
+
+}
+
+
+.stats strong {
+
+    display: block;
+
+    font-size: 28px;
+
+    color: #126b3c;
+
+}
+
+
+.stats span {
+
+    color: #666;
+
+}
+
+
+.complaints {
+
+    max-width: 1000px;
+
+    margin: 40px auto;
+
+}
+
+
+.complaints > h2 {
+
+    margin-bottom: 20px;
+
+    color: #126b3c;
+
+}
+
+
+.complaint-card {
+
+    background: white;
+
+    padding: 25px;
+
+    margin-bottom: 25px;
+
+    border-radius: 15px;
+
+    box-shadow:
+        0 5px 20px rgba(0,0,0,0.08);
+
+}
+
+
+.complaint-header {
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: center;
+
+    flex-wrap: wrap;
+
+    gap: 10px;
+
+    margin-bottom: 20px;
+
+}
+
+
+.complaint-header h2 {
+
+    color: #126b3c;
+
+}
+
+
+.status {
+
+    padding: 8px 14px;
+
+    border-radius: 20px;
+
+    background: #fff3cd;
+
+    color: #856404;
+
+    font-weight: bold;
+
+}
+
+
+.garbage-image {
+
+    width: 100%;
+
+    max-height: 400px;
+
+    object-fit: cover;
+
+    border-radius: 10px;
+
+    margin-bottom: 20px;
+
+}
+
+
+.location-box {
+
+    background: #f1f7f3;
+
+    padding: 18px;
+
+    border-radius: 12px;
+
+    margin: 15px 0;
+
+}
+
+
+.location-box h3 {
+
+    color: #126b3c;
+
+    margin-bottom: 10px;
+
+}
+
+
+.address {
+
+    line-height: 1.5;
+
+    margin-bottom: 15px;
+
+}
+
+
+.map-button {
+
+    display: inline-block;
+
+    padding: 11px 15px;
+
+    background: #167a45;
+
+    color: white;
+
+    text-decoration: none;
+
+    border-radius: 8px;
+
+}
+
+
+.complaint-info p {
+
+    margin: 12px 0;
+
+    line-height: 1.5;
+
+}
+
+
+.coordinates {
+
+    color: #777;
+
+    font-size: 13px;
+
+}
+
+
+.no-description {
+
+    color: #777;
+
+    font-style: italic;
+
+}
+
+
+.earned {
+
+    color: #167a45;
+
+    font-weight: bold;
+
+}
+
+
+.denied-reason {
+
+    color: #a12626;
+
+    font-weight: bold;
+
+}
+
+
+.deny-reason-input {
+
+    flex: 1;
+
+    min-width: 0;
+
+    padding: 6px 10px;
+
+    border: 1px solid #ccc;
+
+    border-radius: 6px;
+
+}
+
+
+.status-form {
+
+    display: flex;
+
+    flex-direction: row;
+
+    align-items: center;
+
+    gap: 10px;
+
+    margin-top: 20px;
+
+}
+
+
+.status-form label {
+
+    margin: 0;
+
+}
+
+
+.status-form button {
+
+    margin: 0;
+
+}
+
+
+.leaderboard {
+
+    max-width: 750px;
+
+    margin: auto;
+
+}
+
+
+.leaderboard h1 {
+
+    text-align: center;
+
+    color: #126b3c;
+
+    margin-bottom: 10px;
+
+}
+
+
+.leaderboard > p {
+
+    text-align: center;
+
+    color: #666;
+
+    margin-bottom: 30px;
+
+}
+
+
+.leaderboard-row {
+
+    background: white;
+
+    padding: 18px;
+
+    margin-bottom: 12px;
+
+    border-radius: 12px;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 20px;
+
+    box-shadow:
+        0 3px 12px rgba(0,0,0,0.07);
+
+}
+
+
+.current-user {
+
+    border: 2px solid #167a45;
+
+}
+
+
+.rank {
+
+    width: 50px;
+
+    font-size: 24px;
+
+    text-align: center;
+
+}
+
+
+.leader-name {
+
+    flex: 1;
+
+}
+
+
+.leader-name strong {
+
+    display: block;
+
+    font-size: 17px;
+
+}
+
+
+.leader-name small {
+
+    color: #777;
+
+}
+
+
+.leader-points {
+
+    font-weight: bold;
+
+    color: #167a45;
+
+}
+
+
+.empty {
+
+    background: white;
+
+    padding: 45px;
+
+    text-align: center;
+
+    border-radius: 15px;
+
+}
+
+
+footer {
+
+    background: #126b3c;
+
+    color: white;
+
+    text-align: center;
+
+    padding: 20px;
+
+}
+
+
+@media (max-width: 650px) {
+
+    nav {
+
+        flex-direction: column;
+
+        padding: 15px;
+
+    }
+
+
+    nav a {
+
+        margin: 5px;
+
+    }
+
+
+    .hero h1 {
+
+        font-size: 30px;
+
+    }
+
+
+    .card {
+
+        padding: 25px 18px;
+
+    }
+
+
+    .report-map {
+
+        height: 300px;
+
+    }
+
+
+    .stats {
+
+        flex-direction: column;
+
+    }
+
+
+    .status-form {
+
+        flex-direction: column;
+
+        align-items: stretch;
+
+    }
+
+
+    .leaderboard-row {
+
+        gap: 10px;
+
+    }
+
+
+    .complaint-card {
+
+        padding: 18px;
+
+    }
+
+
+    .complaint-header h2 {
+
+        font-size: 18px;
+
+    }
+
+
+    .impact-card {
+
+        padding: 25px 18px;
+
+    }
+
+
+    .points {
+
+        font-size: 26px;
+
+    }
+
+}
+
+
+@media (max-width: 400px) {
+
+    .hero h1 {
+
+        font-size: 24px;
+
+    }
+
+
+    .hero p {
+
+        font-size: 15px;
+
+    }
+
+
+    .rank {
+
+        width: 34px;
+
+        font-size: 18px;
+
+    }
+
+
+    .leader-name strong {
+
+        font-size: 15px;
+
+    }
+
+
+    .leaderboard-row {
+
+        padding: 14px;
+
+    }
+
+
+    .report-button {
+
+        font-size: 17px;
+
+        padding: 14px;
+
+    }
+
+
+    .garbage-image {
+
+        max-height: 260px;
+
+    }
+
+}   

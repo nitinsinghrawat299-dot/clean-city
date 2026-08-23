@@ -1,0 +1,6 @@
+Flask
+python-dotenv
+requests
+firebase-admin
+cloudinary
+gunicorn
