@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Citizen Login - CleanCity</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+</head>
+
+<body>
+
+<nav>
+    <h2>🌱 CleanCity</h2>
+
+    <div>
+        <a href="/register">Create Account</a>
+        <a href="/login">Municipality</a>
+    </div>
+</nav>
+
+
+<main>
+
+<section class="card">
+
+    <h2>👋 Welcome Back!</h2>
+
+    <p>
+        Login to report garbage and track your CleanCity impact.
+    </p>
+
+
+    {% with messages = get_flashed_messages() %}
+
+        {% if messages %}
+
+            {% for message in messages %}
+
+                <div class="flash">
+                    {{ message }}
+                </div>
+
+            {% endfor %}
+
+        {% endif %}
+
+    {% endwith %}
+
+
+    <form method="POST" action="/citizen-login">
+
+        <label>
+            👤 Username
+        </label>
+
+        <input
+            type="text"
+            name="username"
+            placeholder="Enter your username"
+            value="{{ prefill_username or '' }}"
+            required
+        >
+
+
+        <label>
+            🔒 Password
+        </label>
+
+        <div class="password-field">
+
+            <input
+                type="password"
+                name="password"
+                id="citizen_password"
+                placeholder="Enter your password"
+                value="{{ prefill_password or '' }}"
+                required
+            >
+
+            <button
+                type="button"
+                class="toggle-password"
+                data-target="citizen_password"
+                aria-label="Show password"
+            >
+                👁️
+            </button>
+
+        </div>
+
+
+        <p class="forgot-password-link">
+            <a href="/forgot-password">
+                Forgot your password?
+            </a>
+        </p>
+
+
+        <button type="submit">
+            🚀 Login
+        </button>
+
+    </form>
+
+
+    <p class="center-text">
+
+        Don't have an account?
+
+        <a href="/register">
+            🌱 Create one
+        </a>
+
+    </p>
+
+
+</section>
+
+</main>
+
+<script
+    src="{{ url_for('static', filename='script.js') }}"
+></script>
+
+</body>
+</html>

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Municipality Login - CleanCity</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+
+</head>
+
+
+<body>
+
+
+<nav>
+
+    <h2>
+        🏛️ CleanCity Municipality
+    </h2>
+
+    <div>
+
+        <a href="/citizen-login">
+            Citizen Login
+        </a>
+
+    </div>
+
+</nav>
+
+
+<main>
+
+
+<section class="card">
+
+    <h2>
+        🔐 Municipality Login
+    </h2>
+
+    <p>
+        Authorized municipality personnel only.
+    </p>
+
+
+    {% with messages = get_flashed_messages() %}
+
+        {% if messages %}
+
+            {% for message in messages %}
+
+                <div class="flash">
+                    {{ message }}
+                </div>
+
+            {% endfor %}
+
+        {% endif %}
+
+    {% endwith %}
+
+
+    <form
+        method="POST"
+        action="/login"
+    >
+
+
+        <label>
+            🏛️ Municipality Username
+        </label>
+
+
+        <input
+            type="text"
+            name="username"
+            placeholder="Enter municipality username"
+            required
+        >
+
+
+        <label>
+            🔒 Password
+        </label>
+
+
+        <div class="password-field">
+
+            <input
+                type="password"
+                name="password"
+                id="admin_password"
+                placeholder="Enter municipality password"
+                required
+            >
+
+            <button
+                type="button"
+                class="toggle-password"
+                data-target="admin_password"
+                aria-label="Show password"
+            >
+                👁️
+            </button>
+
+        </div>
+
+
+        <button type="submit">
+            🏛️ Login to Dashboard
+        </button>
+
+
+    </form>
+
+
+    <p class="center-text">
+
+        Are you a citizen?
+
+        <a href="/citizen-login">
+            Login here
+        </a>
+
+    </p>
+
+
+</section>
+
+
+</main>
+
+
+<script
+    src="{{ url_for('static', filename='script.js') }}"
+></script>
+
+
+</body>
+
+</html>

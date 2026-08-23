@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Join CleanCity</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+
+</head>
+
+
+<body>
+
+
+<nav>
+
+    <h2>🌱 CleanCity</h2>
+
+</nav>
+
+
+<main>
+
+
+<section class="card">
+
+
+    <h2>
+        🌱 Join CleanCity
+    </h2>
+
+
+    <p>
+        Create your account and start making your city cleaner.
+    </p>
+
+
+    {% with messages = get_flashed_messages() %}
+
+        {% if messages %}
+
+            {% for message in messages %}
+
+                <div class="flash">
+                    {{ message }}
+                </div>
+
+            {% endfor %}
+
+        {% endif %}
+
+    {% endwith %}
+
+
+    <form method="POST" id="register-form">
+
+
+        <label>
+            Choose a username
+        </label>
+
+
+        <input
+            type="text"
+            name="username"
+            placeholder="Example: Rahul123"
+            required
+        >
+
+
+        <label>
+            Email address
+        </label>
+
+
+        <input
+            type="email"
+            name="email"
+            placeholder="you@example.com"
+            required
+        >
+
+        <p class="field-hint">
+            Used only to send you a password reset link if you ever
+            need one.
+        </p>
+
+
+        <label>
+            Choose a password
+        </label>
+
+        <div class="password-field">
+
+            <input
+                type="password"
+                name="password"
+                id="password"
+                placeholder="At least 4 characters"
+                minlength="4"
+                required
+            >
+
+            <button
+                type="button"
+                class="toggle-password"
+                data-target="password"
+                aria-label="Show password"
+            >
+                👁️
+            </button>
+
+        </div>
+
+
+        <label>
+            Confirm password
+        </label>
+
+        <div class="password-field">
+
+            <input
+                type="password"
+                name="confirm_password"
+                id="confirm_password"
+                placeholder="Re-enter your password"
+                minlength="4"
+                required
+            >
+
+            <button
+                type="button"
+                class="toggle-password"
+                data-target="confirm_password"
+                aria-label="Show password"
+            >
+                👁️
+            </button>
+
+        </div>
+
+        <p id="password-mismatch" class="field-hint field-error" hidden>
+            Passwords do not match.
+        </p>
+
+
+        <button type="submit">
+            🌱 Create Account
+        </button>
+
+
+    </form>
+
+
+    <p class="center-text">
+
+        Already have an account?
+
+        <a href="/citizen-login">
+            Login
+        </a>
+
+    </p>
+
+
+</section>
+
+
+</main>
+
+
+<script
+    src="{{ url_for('static', filename='script.js') }}"
+></script>
+
+
+<script>
+
+    document.getElementById("register-form").addEventListener(
+        "submit",
+        function (event) {
+
+            const password = document.getElementById("password").value;
+
+            const confirm = document.getElementById("confirm_password").value;
+
+            const mismatchNote = document.getElementById("password-mismatch");
+
+            if (password !== confirm) {
+
+                event.preventDefault();
+
+                mismatchNote.hidden = false;
+
+            } else {
+
+                mismatchNote.hidden = true;
+
+            }
+
+        }
+    );
+
+</script>
+
+
+</body>
+
+</html>

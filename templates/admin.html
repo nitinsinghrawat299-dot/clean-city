@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Municipality Dashboard</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+
+</head>
+
+
+<body>
+
+
+<nav>
+
+    <h2>
+        🏛️ CleanCity Municipality
+    </h2>
+
+
+    <div>
+
+        <a href="/">
+            Citizen Portal
+        </a>
+
+        <a href="/leaderboard">
+            Leaderboard
+        </a>
+
+        <a href="/logout">
+            Logout
+        </a>
+
+    </div>
+
+</nav>
+
+
+<main>
+
+
+<section class="hero">
+
+    <h1>
+        Municipality Dashboard
+    </h1>
+
+    <p>
+        Verify reports and keep the city clean.
+    </p>
+
+</section>
+
+
+<section class="complaints">
+
+
+{% if complaints %}
+
+
+{% for complaint in complaints %}
+
+
+<div class="complaint-card">
+
+
+    <div class="complaint-header">
+
+        <h2>
+            Complaint #{{ complaint["report_number"] or "—" }}
+        </h2>
+
+
+        <span class="status">
+            {{ complaint["status"] }}
+        </span>
+
+    </div>
+
+
+    {% if complaint["image"] %}
+
+    <img
+        src="{{ complaint['image'] }}"
+        class="garbage-image"
+        alt="Garbage Image"
+    >
+
+    {% endif %}
+
+
+    <div class="location-box">
+
+
+        <h3>
+            📍 Location
+        </h3>
+
+
+        <p class="address">
+
+            {{ complaint["address"] or complaint["location"] }}
+
+        </p>
+
+
+        {% if complaint["coordinates"] %}
+
+
+        {% set coords = complaint["coordinates"].split(',') %}
+
+
+        {% if coords|length == 2 %}
+
+        <a
+            href="https://www.google.com/maps?q={{ coords[0] }},{{ coords[1] }}"
+            target="_blank"
+            class="map-button"
+        >
+            🗺️ Open in Google Maps
+        </a>
+
+        {% endif %}
+
+
+        {% endif %}
+
+
+    </div>
+
+
+    <div class="complaint-info">
+
+
+        <p>
+
+            👤
+
+            <strong>
+                Citizen:
+            </strong>
+
+            {{ complaint["citizen_username"] or "Unknown" }}
+
+        </p>
+
+
+        <p>
+
+            📝
+
+            <strong>
+                Description:
+            </strong>
+
+
+            {% if complaint["description"] %}
+
+                {{ complaint["description"] }}
+
+            {% else %}
+
+                <span class="no-description">
+                    No description provided.
+                </span>
+
+            {% endif %}
+
+        </p>
+
+
+        {% if complaint["coordinates"] %}
+
+        <p class="coordinates">
+
+            📍 GPS:
+            {{ complaint["coordinates"] }}
+
+        </p>
+
+        {% endif %}
+
+
+        {% if complaint["points_awarded"] > 0 %}
+
+        <p class="earned">
+
+            ⭐ {{ complaint["points_awarded"] }}
+            points already awarded
+
+        </p>
+
+        {% endif %}
+
+
+        {% if complaint["status"] == "Denied" and complaint["denial_reason"] %}
+
+        <p class="denied-reason">
+
+            ⛔ <strong>Denied:</strong>
+            {{ complaint["denial_reason"] }}
+
+        </p>
+
+        {% endif %}
+
+
+    </div>
+
+
+    <form
+        action="/update/{{ complaint['id'] }}"
+        method="POST"
+        class="status-form"
+    >
+
+
+        <label>
+            Status:
+        </label>
+
+
+        <select name="status">
+
+
+            <option
+                value="Reported"
+                {% if complaint["status"] == "Reported" %}
+                selected
+                {% endif %}
+            >
+                🔴 Reported
+            </option>
+
+
+            <option
+                value="In Progress"
+                {% if complaint["status"] == "In Progress" %}
+                selected
+                {% endif %}
+            >
+                🟡 In Progress
+            </option>
+
+
+            <option
+                value="Resolved"
+                {% if complaint["status"] == "Resolved" %}
+                selected
+                {% endif %}
+            >
+                🟢 Resolved
+            </option>
+
+
+            <option
+                value="Denied"
+                {% if complaint["status"] == "Denied" %}
+                selected
+                {% endif %}
+            >
+                ⛔ Denied
+            </option>
+
+
+        </select>
+
+
+        <input
+            type="text"
+            name="reason"
+            placeholder="Reason (only needed if denying)"
+            value="{{ complaint['denial_reason'] or '' }}"
+            class="deny-reason-input"
+        >
+
+
+        <button type="submit">
+            Update Status
+        </button>
+
+
+    </form>
+
+
+    <form
+        action="/delete/{{ complaint['id'] }}"
+        method="POST"
+        class="delete-form"
+        onsubmit="return confirm('Delete report #{{ complaint['report_number'] or complaint['id'] }}? This cannot be undone.');"
+    >
+
+        <button type="submit" class="delete-button">
+            🗑️ Delete Report
+        </button>
+
+    </form>
+
+
+</div>
+
+
+{% endfor %}
+
+
+{% else %}
+
+
+<div class="empty">
+
+    <h2>
+        🎉 No complaints
+    </h2>
+
+    <p>
+        There are currently no garbage reports.
+    </p>
+
+</div>
+
+
+{% endif %}
+
+
+</section>
+
+
+</main>
+
+
+<footer>
+
+    CleanCity © 2026
+
+</footer>
+
+
+</body>
+
+</html>
