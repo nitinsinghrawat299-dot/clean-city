@@ -36,6 +36,10 @@
             Citizen Portal
         </a>
 
+        <a href="/admin/users">
+            👥 Manage Citizens
+        </a>
+
         <a href="/leaderboard">
             Leaderboard
         </a>
@@ -80,7 +84,7 @@
     <div class="complaint-header">
 
         <h2>
-            Complaint #{{ complaint["id"] }}
+            Complaint #{{ complaint["report_number"] or "—" }}
         </h2>
 
 
@@ -292,6 +296,20 @@
             Update Status
         </button>
 
+
+    </form>
+
+
+    <form
+        action="/delete/{{ complaint['id'] }}"
+        method="POST"
+        class="delete-form"
+        onsubmit="return confirm('Delete report #{{ complaint['report_number'] or complaint['id'] }}? This cannot be undone.');"
+    >
+
+        <button type="submit" class="delete-button">
+            🗑️ Delete Report
+        </button>
 
     </form>
 

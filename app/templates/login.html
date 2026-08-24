@@ -95,12 +95,26 @@
         </label>
 
 
-        <input
-            type="password"
-            name="password"
-            placeholder="Enter municipality password"
-            required
-        >
+        <div class="password-field">
+
+            <input
+                type="password"
+                name="password"
+                id="admin_password"
+                placeholder="Enter municipality password"
+                required
+            >
+
+            <button
+                type="button"
+                class="toggle-password"
+                data-target="admin_password"
+                aria-label="Show password"
+            >
+                👁️
+            </button>
+
+        </div>
 
 
         <button type="submit">
@@ -126,6 +140,11 @@
 
 
 </main>
+
+
+<script
+    src="{{ url_for('static', filename='script.js') }}"
+></script>
 
 
 </body>

@@ -12,10 +12,15 @@ import os
 import uuid
 import requests
 import datetime
+import secrets
+import smtplib
+import ssl
+from email.mime.text import MIMEText
 
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 import urllib.parse
 import firebase_admin
@@ -28,6 +33,19 @@ import cloudinary.uploader
 load_dotenv()
 
 app = Flask(__name__)
+
+# Render (and most PaaS hosts) sit behind a reverse proxy that terminates
+# HTTPS — without this, Flask doesn't know the original request was HTTPS,
+# so links it builds itself (like password reset links) would come out as
+# "http://" instead of "https://".
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+
+# Sessions are signed cookies, so they don't depend on server memory —
+# but by default Flask treats them as "browser session" cookies, which
+# some mobile browsers clear when the app is backgrounded / the tab is
+# switched. Making sessions permanent (with a real expiry) fixes the
+# "gets logged out when switching tabs" issue.
+app.config["PERMANENT_SESSION_LIFETIME"] = datetime.timedelta(days=14)
 
 
 # -----------------------------------------------------------
@@ -54,6 +72,32 @@ if not ADMIN_USERNAME or not ADMIN_PASSWORD_HASH:
     )
 
 
+# Usernames that citizens are not allowed to register, so nobody can
+# impersonate the municipality account (or other reserved/official
+# sounding names) in the citizen portal or on the leaderboard.
+RESERVED_USERNAMES = {
+    ADMIN_USERNAME.strip().lower(),
+    "admin",
+    "administrator",
+    "municipality",
+    "municipal",
+    "cleancity",
+    "clean city",
+    "official",
+    "government",
+    "govt",
+    "staff",
+    "support",
+    "moderator",
+    "root",
+    "superuser",
+}
+
+
+def is_reserved_username(username):
+    return username.strip().lower() in RESERVED_USERNAMES
+
+
 # -----------------------------------------------------------
 # FIREBASE — Firestore (database)
 # -----------------------------------------------------------
@@ -75,6 +119,101 @@ else:
     firebase_admin.initialize_app()
 
 db = firestore.client()
+
+
+# -----------------------------------------------------------
+# SEQUENTIAL REPORT NUMBERS — Firestore document IDs are random
+# strings (e.g. "us7Xk2..."), not useful to show citizens/admins.
+# This keeps a single counter document and atomically increments it
+# inside a transaction, so every complaint gets a clean, natural
+# report number (1, 2, 3, ...) even with concurrent submissions.
+# -----------------------------------------------------------
+
+_report_counter_ref = db.collection("counters").document("complaints")
+
+
+@firestore.transactional
+def _increment_report_counter(transaction):
+
+    snapshot = _report_counter_ref.get(transaction=transaction)
+
+    current_value = snapshot.get("value") if snapshot.exists else 0
+
+    next_value = current_value + 1
+
+    transaction.set(_report_counter_ref, {"value": next_value})
+
+    return next_value
+
+
+def get_next_report_number():
+    return _increment_report_counter(db.transaction())
+
+
+# -----------------------------------------------------------
+# EMAIL — used only for "forgot password" reset links.
+# Works with Gmail (an App Password, not your normal password)
+# or SendGrid's SMTP relay — any standard SMTP provider will do.
+# -----------------------------------------------------------
+
+SMTP_SERVER = os.environ.get("SMTP_SERVER")
+
+SMTP_PORT = int(os.environ.get("SMTP_PORT", 587))
+
+SMTP_USERNAME = os.environ.get("SMTP_USERNAME")
+
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD")
+
+EMAIL_FROM = os.environ.get("EMAIL_FROM", SMTP_USERNAME)
+
+RESET_TOKEN_LIFETIME_MINUTES = 60
+
+
+def send_email(to_email, subject, body_text):
+    """
+    Sends a plain-text email via SMTP. Returns True on success.
+
+    If SMTP isn't configured (e.g. still in local dev without a mail
+    provider set up), this logs to the console instead of raising —
+    so the rest of the app keeps working even before email is wired up.
+    """
+
+    if not SMTP_SERVER or not SMTP_USERNAME or not SMTP_PASSWORD:
+
+        print(
+            "[email not configured] Would have sent to "
+            f"{to_email}:\n{subject}\n{body_text}"
+        )
+
+        return False
+
+    message = MIMEText(body_text)
+
+    message["Subject"] = subject
+
+    message["From"] = EMAIL_FROM
+
+    message["To"] = to_email
+
+    try:
+
+        context = ssl.create_default_context()
+
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+
+            server.starttls(context=context)
+
+            server.login(SMTP_USERNAME, SMTP_PASSWORD)
+
+            server.sendmail(EMAIL_FROM, [to_email], message.as_string())
+
+        return True
+
+    except Exception as error:
+
+        print(f"[email send failed] {error}")
+
+        return False
 
 
 # -----------------------------------------------------------
@@ -245,11 +384,27 @@ def register():
 
         username = request.form.get("username", "").strip()
 
+        email = request.form.get("email", "").strip().lower()
+
         password = request.form.get("password", "")
+
+        confirm_password = request.form.get("confirm_password", "")
 
         if len(username) < 3:
 
             flash("Username must be at least 3 characters.")
+
+            return redirect(url_for("register"))
+
+        if is_reserved_username(username):
+
+            flash("That username is reserved. Please choose another one.")
+
+            return redirect(url_for("register"))
+
+        if "@" not in email or "." not in email.split("@")[-1]:
+
+            flash("Please enter a valid email address.")
 
             return redirect(url_for("register"))
 
@@ -259,15 +414,31 @@ def register():
 
             return redirect(url_for("register"))
 
+        if password != confirm_password:
+
+            flash("Passwords do not match.")
+
+            return redirect(url_for("register"))
+
         users_ref = db.collection("users")
 
-        existing = list(
+        existing_username = list(
             users_ref.where("username", "==", username).limit(1).stream()
         )
 
-        if existing:
+        if existing_username:
 
             flash("That username already exists.")
+
+            return redirect(url_for("register"))
+
+        existing_email = list(
+            users_ref.where("email", "==", email).limit(1).stream()
+        )
+
+        if existing_email:
+
+            flash("An account with that email already exists.")
 
             return redirect(url_for("register"))
 
@@ -275,12 +446,23 @@ def register():
 
         users_ref.add({
             "username": username,
+            "email": email,
             "password": hashed_password,
             "points": 0,
+            "reset_token": None,
+            "reset_token_expires": None,
             "created_at": firestore.SERVER_TIMESTAMP
         })
 
-        flash("Account created! Please log in.")
+        flash("Account created! Just hit login below.")
+
+        # Carry the just-entered credentials over to the login page so
+        # the user only has to press "Login" — nothing to retype. This
+        # is stashed in the session for exactly one request and popped
+        # as soon as the login page reads it (see citizen_login below).
+        session["prefill_username"] = username
+
+        session["prefill_password"] = password
 
         return redirect(url_for("citizen_login"))
 
@@ -313,6 +495,8 @@ def citizen_login():
             password
         ):
 
+            session.permanent = True
+
             session["citizen_id"] = user_doc.id
 
             session["citizen_username"] = user_doc.to_dict()["username"]
@@ -321,7 +505,17 @@ def citizen_login():
 
         flash("Incorrect username or password.")
 
-    return render_template("citizen_login.html")
+    # Pop (not just read) any prefill values left by a fresh registration
+    # so they're only ever used once, right after signing up.
+    prefill_username = session.pop("prefill_username", "")
+
+    prefill_password = session.pop("prefill_password", "")
+
+    return render_template(
+        "citizen_login.html",
+        prefill_username=prefill_username,
+        prefill_password=prefill_password
+    )
 
 
 # =========================================================
@@ -336,6 +530,140 @@ def citizen_logout():
     session.pop("citizen_username", None)
 
     return redirect(url_for("citizen_login"))
+
+
+# =========================================================
+# FORGOT PASSWORD — request a reset link by email
+# =========================================================
+
+@app.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+
+    if request.method == "POST":
+
+        email = request.form.get("email", "").strip().lower()
+
+        users_ref = db.collection("users")
+
+        matches = list(
+            users_ref.where("email", "==", email).limit(1).stream()
+        )
+
+        if matches:
+
+            user_doc = matches[0]
+
+            token = secrets.token_urlsafe(32)
+
+            expires_at = (
+                datetime.datetime.utcnow()
+                + datetime.timedelta(minutes=RESET_TOKEN_LIFETIME_MINUTES)
+            )
+
+            user_doc.reference.update({
+                "reset_token": token,
+                "reset_token_expires": expires_at.isoformat()
+            })
+
+            reset_link = url_for(
+                "reset_password",
+                token=token,
+                _external=True
+            )
+
+            send_email(
+                to_email=email,
+                subject="Reset your CleanCity password",
+                body_text=(
+                    "We received a request to reset your CleanCity "
+                    "password.\n\n"
+                    f"Click this link to choose a new password:\n{reset_link}\n\n"
+                    f"This link expires in {RESET_TOKEN_LIFETIME_MINUTES} "
+                    "minutes.\n\n"
+                    "If you didn't request this, you can safely ignore "
+                    "this email — your password will stay the same."
+                )
+            )
+
+        # Same message whether or not the email was found, so we don't
+        # reveal which emails have accounts registered.
+        flash(
+            "If that email is registered, we've sent a password reset "
+            "link. Check your inbox (and spam folder)."
+        )
+
+        return redirect(url_for("citizen_login"))
+
+    return render_template("forgot_password.html")
+
+
+# =========================================================
+# RESET PASSWORD — via the emailed token link
+# =========================================================
+
+@app.route("/reset-password/<token>", methods=["GET", "POST"])
+def reset_password(token):
+
+    users_ref = db.collection("users")
+
+    matches = list(
+        users_ref.where("reset_token", "==", token).limit(1).stream()
+    )
+
+    user_doc = matches[0] if matches else None
+
+    token_valid = False
+
+    if user_doc:
+
+        expires_raw = user_doc.to_dict().get("reset_token_expires")
+
+        if expires_raw:
+
+            expires_at = datetime.datetime.fromisoformat(expires_raw)
+
+            if datetime.datetime.utcnow() <= expires_at:
+
+                token_valid = True
+
+    if not token_valid:
+
+        flash(
+            "That reset link is invalid or has expired. Please request "
+            "a new one."
+        )
+
+        return redirect(url_for("forgot_password"))
+
+    if request.method == "POST":
+
+        password = request.form.get("password", "")
+
+        confirm_password = request.form.get("confirm_password", "")
+
+        if len(password) < 4:
+
+            flash("Password must be at least 4 characters.")
+
+            return redirect(url_for("reset_password", token=token))
+
+        if password != confirm_password:
+
+            flash("Passwords do not match.")
+
+            return redirect(url_for("reset_password", token=token))
+
+        user_doc.reference.update({
+            "password": generate_password_hash(password),
+            "reset_token": None,
+            "reset_token_expires": None
+        })
+
+        flash("Your password has been reset. You can log in now.")
+
+        return redirect(url_for("citizen_login"))
+
+    return render_template("reset_password.html", token=token)
 
 
 # =========================================================
@@ -400,6 +728,53 @@ def profile():
 
 
 # =========================================================
+# DELETE MY ACCOUNT (citizen)
+# =========================================================
+
+@app.route("/delete-account", methods=["POST"])
+def delete_account():
+
+    if not session.get("citizen_id"):
+
+        return redirect(url_for("citizen_login"))
+
+    citizen_id = session["citizen_id"]
+
+    password = request.form.get("password", "")
+
+    user_doc = db.collection("users").document(citizen_id).get()
+
+    if not user_doc.exists:
+
+        session.pop("citizen_id", None)
+
+        session.pop("citizen_username", None)
+
+        return redirect(url_for("citizen_login"))
+
+    user = user_doc.to_dict()
+
+    # Require the password again as a safety check before permanently
+    # deleting the account — a confirm dialog alone is easy to click
+    # through by accident.
+    if not check_password_hash(user.get("password", ""), password):
+
+        flash("Incorrect password. Your account was NOT deleted.")
+
+        return redirect(url_for("profile"))
+
+    db.collection("users").document(citizen_id).delete()
+
+    session.pop("citizen_id", None)
+
+    session.pop("citizen_username", None)
+
+    flash("Your account has been deleted. We're sad to see you go! 🌱")
+
+    return redirect(url_for("citizen_login"))
+
+
+# =========================================================
 # LEADERBOARD
 # =========================================================
 
@@ -458,12 +833,6 @@ def submit():
 
     address = request.form.get("address", "").strip()
 
-    if len(description) < 5:
-
-        flash("Please add a short description (at least 5 characters).")
-
-        return redirect(url_for("home"))
-
     if len(description) > 1000:
 
         flash("Description is too long (max 1000 characters).")
@@ -505,7 +874,10 @@ def submit():
 
     image_url = upload_image_to_storage(image, extension)
 
+    report_number = get_next_report_number()
+
     db.collection("complaints").add({
+        "report_number": report_number,
         "name": username,
         "description": description,
         "location": location,
@@ -543,6 +915,8 @@ def login():
             username == ADMIN_USERNAME
             and check_password_hash(ADMIN_PASSWORD_HASH, password or "")
         ):
+
+            session.permanent = True
 
             session["admin_logged_in"] = True
 
@@ -619,6 +993,64 @@ def admin():
 
 
 # =========================================================
+# MANAGE CITIZENS (admin) — view + delete citizen accounts
+# =========================================================
+
+@app.route("/admin/users")
+def admin_users():
+
+    if not session.get("admin_logged_in"):
+
+        return redirect(url_for("login"))
+
+    user_docs = (
+        db.collection("users")
+        .order_by("username")
+        .stream()
+    )
+
+    users = []
+
+    for doc in user_docs:
+
+        data = doc.to_dict()
+
+        data["id"] = doc.id
+
+        badge_icon, badge_name = get_badge(data.get("points", 0))
+
+        data["badge_icon"] = badge_icon
+
+        data["badge_name"] = badge_name
+
+        users.append(data)
+
+    return render_template("admin_users.html", users=users)
+
+
+@app.route("/admin/delete-user/<user_id>", methods=["POST"])
+def admin_delete_user(user_id):
+
+    if not session.get("admin_logged_in"):
+
+        return redirect(url_for("login"))
+
+    user_ref = db.collection("users").document(user_id)
+
+    if not user_ref.get().exists:
+
+        flash("That account no longer exists.")
+
+        return redirect(url_for("admin_users"))
+
+    user_ref.delete()
+
+    flash("🗑️ Citizen account deleted.")
+
+    return redirect(url_for("admin_users"))
+
+
+# =========================================================
 # UPDATE COMPLAINT STATUS
 # =========================================================
 
@@ -685,6 +1117,32 @@ def update_status(complaint_id):
         complaint_ref.update({
             "status": new_status
         })
+
+    return redirect(url_for("admin"))
+
+
+# =========================================================
+# DELETE COMPLAINT (admin only)
+# =========================================================
+
+@app.route("/delete/<complaint_id>", methods=["POST"])
+def delete_complaint(complaint_id):
+
+    if not session.get("admin_logged_in"):
+
+        return redirect(url_for("login"))
+
+    complaint_ref = db.collection("complaints").document(complaint_id)
+
+    if not complaint_ref.get().exists:
+
+        flash("That report no longer exists.")
+
+        return redirect(url_for("admin"))
+
+    complaint_ref.delete()
+
+    flash("🗑️ Report deleted.")
 
     return redirect(url_for("admin"))
 

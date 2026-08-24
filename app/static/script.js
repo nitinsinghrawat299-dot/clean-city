@@ -1,3 +1,41 @@
+// -----------------------------------------------------------
+// SHOW/HIDE PASSWORD — wires up every ".toggle-password" button
+// on the page (login, register, admin login all reuse this).
+// -----------------------------------------------------------
+
+document.addEventListener("DOMContentLoaded", function () {
+
+    document.querySelectorAll(".toggle-password").forEach(function (button) {
+
+        button.addEventListener("click", function () {
+
+            const targetId = button.getAttribute("data-target");
+
+            const input = document.getElementById(targetId);
+
+            if (!input) {
+
+                return;
+            }
+
+            const isHidden = input.type === "password";
+
+            input.type = isHidden ? "text" : "password";
+
+            button.textContent = isHidden ? "🙈" : "👁️";
+
+            button.setAttribute(
+                "aria-label",
+                isHidden ? "Hide password" : "Show password"
+            );
+
+        });
+
+    });
+
+});
+
+
 let map = null;
 let marker = null;
 

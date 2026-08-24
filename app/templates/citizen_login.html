@@ -64,6 +64,7 @@
             type="text"
             name="username"
             placeholder="Enter your username"
+            value="{{ prefill_username or '' }}"
             required
         >
 
@@ -72,12 +73,34 @@
             🔒 Password
         </label>
 
-        <input
-            type="password"
-            name="password"
-            placeholder="Enter your password"
-            required
-        >
+        <div class="password-field">
+
+            <input
+                type="password"
+                name="password"
+                id="citizen_password"
+                placeholder="Enter your password"
+                value="{{ prefill_password or '' }}"
+                required
+            >
+
+            <button
+                type="button"
+                class="toggle-password"
+                data-target="citizen_password"
+                aria-label="Show password"
+            >
+                👁️
+            </button>
+
+        </div>
+
+
+        <p class="forgot-password-link">
+            <a href="/forgot-password">
+                Forgot your password?
+            </a>
+        </p>
 
 
         <button type="submit">
@@ -101,6 +124,10 @@
 </section>
 
 </main>
+
+<script
+    src="{{ url_for('static', filename='script.js') }}"
+></script>
 
 </body>
 </html>
