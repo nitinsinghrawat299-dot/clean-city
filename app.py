@@ -15,6 +15,8 @@ import datetime
 import secrets
 import smtplib
 import ssl
+import base64
+import json
 from email.mime.text import MIMEText
 
 from dotenv import load_dotenv
@@ -300,6 +302,120 @@ def contains_garbage(image_bytes):
 
 
 # -----------------------------------------------------------
+# GEMINI VISION CHECK — a second, stricter layer on top of the
+# Roboflow check above. Requires the model to be at least 90%
+# confident the photo shows real garbage AND that the photo
+# doesn't look AI-generated / fake. Uses Gemini's free tier
+# (Flash model) — see GEMINI_API_KEY in .env.example.
+# -----------------------------------------------------------
+
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+
+# "gemini-flash-latest" is an alias Google keeps pointed at
+# whichever Flash model is current, so this doesn't break
+# every time a specific model version gets retired.
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
+
+GEMINI_CONFIDENCE_THRESHOLD = 90
+
+
+def verify_with_gemini(image_bytes, mime_type="image/jpeg"):
+    """
+    Sends the uploaded image to Gemini Vision and asks it to judge
+    whether it's a genuine photo of real garbage/litter.
+
+    Returns a dict: {"passed": bool, "reason": str}.
+
+    Fails open (passed=True) if GEMINI_API_KEY isn't set or the API
+    call fails, so a missing key or a temporary outage never blocks
+    citizens from submitting real reports — same fail-open behavior
+    as the Roboflow check above.
+    """
+
+    if not GEMINI_API_KEY:
+        print("[gemini] Skipped — GEMINI_API_KEY not set.")
+        return {"passed": True, "reason": "Gemini not configured."}
+
+    prompt = (
+        "You are a strict content moderator for a civic garbage-reporting "
+        "app. Look at this image and respond with ONLY a JSON object "
+        "(no markdown, no extra text) in exactly this format: "
+        '{"is_garbage": true or false, "confidence": a number from 0 to '
+        '100, "looks_fake_or_ai_generated": true or false, "reason": '
+        '"one short sentence"}. '
+        "is_garbage should be true only if the image clearly shows real "
+        "garbage, litter, trash, or waste in a real-world outdoor or "
+        "indoor setting. confidence is how confident you are in that "
+        "judgment. looks_fake_or_ai_generated should be true if the "
+        "image appears to be AI-generated, a stock photo, a screenshot, "
+        "a drawing/illustration, or otherwise not an authentic photo "
+        "taken by a camera of a real place."
+    )
+
+    try:
+        response = requests.post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/"
+            f"{GEMINI_MODEL}:generateContent",
+            params={"key": GEMINI_API_KEY},
+            json={
+                "contents": [{
+                    "parts": [
+                        {"text": prompt},
+                        {
+                            "inline_data": {
+                                "mime_type": mime_type,
+                                "data": base64.b64encode(
+                                    image_bytes
+                                ).decode("utf-8")
+                            }
+                        }
+                    ]
+                }],
+                "generationConfig": {
+                    "response_mime_type": "application/json"
+                }
+            },
+            timeout=15,
+        )
+
+        response.raise_for_status()
+
+        result = response.json()
+
+        raw_text = (
+            result["candidates"][0]["content"]["parts"][0]["text"]
+        )
+
+        verdict = json.loads(raw_text)
+
+        is_garbage = bool(verdict.get("is_garbage"))
+
+        confidence = float(verdict.get("confidence", 0))
+
+        looks_fake = bool(verdict.get("looks_fake_or_ai_generated"))
+
+        reason = verdict.get("reason", "")
+
+        passed = (
+            is_garbage
+            and confidence >= GEMINI_CONFIDENCE_THRESHOLD
+            and not looks_fake
+        )
+
+        print(
+            f"[gemini] is_garbage={is_garbage} confidence={confidence} "
+            f"looks_fake={looks_fake} passed={passed} reason={reason!r}"
+        )
+
+        return {"passed": passed, "reason": reason}
+
+    except Exception as error:
+        # Fail open — don't block real reports over an API hiccup.
+        print(f"[gemini] ERROR — failing open: {error}")
+        return {"passed": True, "reason": "Gemini check unavailable."}
+
+
+# -----------------------------------------------------------
 # UPLOADS — restricted to image types, capped in size
 # -----------------------------------------------------------
 
@@ -370,7 +486,23 @@ def home():
 
         return redirect(url_for("citizen_login"))
 
-    return render_template("index.html")
+    citizen_id = session["citizen_id"]
+
+    user_doc = db.collection("users").document(citizen_id).get()
+
+    active_warning = None
+
+    if user_doc.exists:
+
+        user = user_doc.to_dict()
+
+        if user.get("warning_message") and not user.get(
+            "warning_acknowledged", True
+        ):
+
+            active_warning = user["warning_message"]
+
+    return render_template("index.html", active_warning=active_warning)
 
 
 # =========================================================
@@ -451,6 +583,9 @@ def register():
             "points": 0,
             "reset_token": None,
             "reset_token_expires": None,
+            "warning_message": None,
+            "warning_issued_at": None,
+            "warning_acknowledged": True,
             "created_at": firestore.SERVER_TIMESTAMP
         })
 
@@ -868,6 +1003,22 @@ def submit():
 
         return redirect(url_for("home"))
 
+    mime_type = f"image/{extension}" if extension != "jpg" else "image/jpeg"
+
+    gemini_result = verify_with_gemini(image_bytes, mime_type)
+
+    if not gemini_result["passed"]:
+
+        flash(
+            "Our AI verification couldn't confirm this is a genuine "
+            "garbage photo. "
+            + (gemini_result["reason"] or "")
+            + " Please upload an original, unedited photo of the "
+            "actual garbage."
+        )
+
+        return redirect(url_for("home"))
+
     # Reset stream position, then upload (contains_garbage already
     # consumed the bytes for the API check above).
     image.stream.seek(0)
@@ -1048,6 +1199,84 @@ def admin_delete_user(user_id):
     flash("🗑️ Citizen account deleted.")
 
     return redirect(url_for("admin_users"))
+
+
+@app.route("/admin/warn-user/<user_id>", methods=["POST"])
+def admin_warn_user(user_id):
+
+    if not session.get("admin_logged_in"):
+
+        return redirect(url_for("login"))
+
+    warning_message = request.form.get("warning_message", "").strip()
+
+    if not warning_message:
+
+        flash("Please write a warning message before sending.")
+
+        return redirect(url_for("admin_users"))
+
+    user_ref = db.collection("users").document(user_id)
+
+    user_doc = user_ref.get()
+
+    if not user_doc.exists:
+
+        flash("That account no longer exists.")
+
+        return redirect(url_for("admin_users"))
+
+    user = user_doc.to_dict()
+
+    user_ref.update({
+        "warning_message": warning_message,
+        "warning_issued_at": firestore.SERVER_TIMESTAMP,
+        "warning_acknowledged": False
+    })
+
+    email = user.get("email")
+
+    if email:
+
+        send_email(
+            to_email=email,
+            subject="⚠️ Warning from CleanCity Municipality",
+            body_text=(
+                f"Hi {user.get('username', 'Citizen')},\n\n"
+                "The CleanCity municipality team has issued a warning "
+                "on your account:\n\n"
+                f'"{warning_message}"\n\n'
+                "Please log in and acknowledge this warning. If the "
+                "issue isn't resolved, your account may be deleted.\n\n"
+                "— CleanCity Municipality"
+            )
+        )
+
+    flash(f"⚠️ Warning sent to {user.get('username', 'the citizen')}.")
+
+    return redirect(url_for("admin_users"))
+
+
+# =========================================================
+# ACKNOWLEDGE WARNING (citizen)
+# =========================================================
+
+@app.route("/acknowledge-warning", methods=["POST"])
+def acknowledge_warning():
+
+    if not session.get("citizen_id"):
+
+        return redirect(url_for("citizen_login"))
+
+    citizen_id = session["citizen_id"]
+
+    db.collection("users").document(citizen_id).update({
+        "warning_acknowledged": True
+    })
+
+    flash("Thanks for acknowledging the warning.")
+
+    return redirect(request.referrer or url_for("home"))
 
 
 # =========================================================
