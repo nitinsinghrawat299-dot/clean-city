@@ -1,6 +1,6 @@
 Flask
 python-dotenv
 requests
-firebase-admin
+firebase-admin==6.9.0
 cloudinary
 gunicorn
