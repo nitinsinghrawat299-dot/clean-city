@@ -15,8 +15,6 @@ import datetime
 import secrets
 import smtplib
 import ssl
-import base64
-import json
 from email.mime.text import MIMEText
 
 from dotenv import load_dotenv
@@ -25,9 +23,9 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 import urllib.parse
-import firebase_admin
-from firebase_admin import credentials, firestore
+from google.cloud import firestore
 from google.cloud.firestore_v1 import Increment
+from google.oauth2 import service_account
 import cloudinary
 import cloudinary.uploader
 
@@ -101,7 +99,11 @@ def is_reserved_username(username):
 
 
 # -----------------------------------------------------------
-# FIREBASE — Firestore (database)
+# FIRESTORE (database) — connects directly via google-cloud-firestore
+# rather than through the firebase_admin wrapper. This sidesteps a
+# class of "Invalid database id (default)" errors some deployments hit
+# with the firebase_admin abstraction layer, especially under Gunicorn
+# with multiple workers.
 # -----------------------------------------------------------
 #
 # Locally: set GOOGLE_APPLICATION_CREDENTIALS in your .env to the path
@@ -114,13 +116,17 @@ def is_reserved_username(username):
 cred_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
 
 if cred_path:
-    cred = credentials.Certificate(cred_path)
-    firebase_admin.initialize_app(cred)
+    gcp_credentials = service_account.Credentials.from_service_account_file(
+        cred_path
+    )
+    db = firestore.Client(
+        credentials=gcp_credentials,
+        project=gcp_credentials.project_id,
+        database="(default)"
+    )
 else:
     # Cloud Run / any environment with Application Default Credentials
-    firebase_admin.initialize_app()
-    
-db = firestore.client(database_id="")
+    db = firestore.Client(database="(default)")
 
 
 # -----------------------------------------------------------
@@ -244,175 +250,6 @@ cloudinary.config(
     api_secret=_parsed_cloudinary_url.password,
     secure=True
 )
-
-
-# -----------------------------------------------------------
-# GARBAGE IMAGE CHECK — uses Roboflow's free garbage-detection
-# model so citizens can't upload random / unrelated photos.
-# -----------------------------------------------------------
-
-ROBOFLOW_API_KEY = os.environ.get("ROBOFLOW_API_KEY")
-
-ROBOFLOW_MODEL_ID = os.environ.get(
-    "ROBOFLOW_MODEL_ID",
-    "garbage_detection-wvzwv/9"
-)
-
-GARBAGE_CONFIDENCE_THRESHOLD = 0.35
-
-
-def contains_garbage(image_bytes):
-    """
-    Sends the uploaded image bytes to the Roboflow garbage-detection API.
-
-    Returns True if garbage/litter is detected with confidence above
-    the threshold, False otherwise. Fails open (returns True) if the
-    API key isn't set or the call fails, so a temporary outage never
-    blocks citizens from submitting real reports.
-    """
-
-    if not ROBOFLOW_API_KEY:
-        return True
-
-    try:
-        response = requests.post(
-            f"https://detect.roboflow.com/{ROBOFLOW_MODEL_ID}",
-            params={
-                "api_key": ROBOFLOW_API_KEY,
-                "confidence": int(GARBAGE_CONFIDENCE_THRESHOLD * 100),
-            },
-            files={"file": image_bytes},
-            timeout=10,
-        )
-
-        response.raise_for_status()
-
-        result = response.json()
-
-        predictions = result.get("predictions", [])
-
-        for prediction in predictions:
-            if prediction.get("confidence", 0) >= GARBAGE_CONFIDENCE_THRESHOLD:
-                return True
-
-        return False
-
-    except Exception:
-        return True
-
-
-# -----------------------------------------------------------
-# GEMINI VISION CHECK — a second, stricter layer on top of the
-# Roboflow check above. Requires the model to be at least 90%
-# confident the photo shows real garbage AND that the photo
-# doesn't look AI-generated / fake. Uses Gemini's free tier
-# (Flash model) — see GEMINI_API_KEY in .env.example.
-# -----------------------------------------------------------
-
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-
-# "gemini-flash-latest" is an alias Google keeps pointed at
-# whichever Flash model is current, so this doesn't break
-# every time a specific model version gets retired.
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
-
-GEMINI_CONFIDENCE_THRESHOLD = 90
-
-
-def verify_with_gemini(image_bytes, mime_type="image/jpeg"):
-    """
-    Sends the uploaded image to Gemini Vision and asks it to judge
-    whether it's a genuine photo of real garbage/litter.
-
-    Returns a dict: {"passed": bool, "reason": str}.
-
-    Fails open (passed=True) if GEMINI_API_KEY isn't set or the API
-    call fails, so a missing key or a temporary outage never blocks
-    citizens from submitting real reports — same fail-open behavior
-    as the Roboflow check above.
-    """
-
-    if not GEMINI_API_KEY:
-        print("[gemini] Skipped — GEMINI_API_KEY not set.")
-        return {"passed": True, "reason": "Gemini not configured."}
-
-    prompt = (
-        "You are a strict content moderator for a civic garbage-reporting "
-        "app. Look at this image and respond with ONLY a JSON object "
-        "(no markdown, no extra text) in exactly this format: "
-        '{"is_garbage": true or false, "confidence": a number from 0 to '
-        '100, "looks_fake_or_ai_generated": true or false, "reason": '
-        '"one short sentence"}. '
-        "is_garbage should be true only if the image clearly shows real "
-        "garbage, litter, trash, or waste in a real-world outdoor or "
-        "indoor setting. confidence is how confident you are in that "
-        "judgment. looks_fake_or_ai_generated should be true if the "
-        "image appears to be AI-generated, a stock photo, a screenshot, "
-        "a drawing/illustration, or otherwise not an authentic photo "
-        "taken by a camera of a real place."
-    )
-
-    try:
-        response = requests.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/"
-            f"{GEMINI_MODEL}:generateContent",
-            params={"key": GEMINI_API_KEY},
-            json={
-                "contents": [{
-                    "parts": [
-                        {"text": prompt},
-                        {
-                            "inline_data": {
-                                "mime_type": mime_type,
-                                "data": base64.b64encode(
-                                    image_bytes
-                                ).decode("utf-8")
-                            }
-                        }
-                    ]
-                }],
-                "generationConfig": {
-                    "response_mime_type": "application/json"
-                }
-            },
-            timeout=15,
-        )
-
-        response.raise_for_status()
-
-        result = response.json()
-
-        raw_text = (
-            result["candidates"][0]["content"]["parts"][0]["text"]
-        )
-
-        verdict = json.loads(raw_text)
-
-        is_garbage = bool(verdict.get("is_garbage"))
-
-        confidence = float(verdict.get("confidence", 0))
-
-        looks_fake = bool(verdict.get("looks_fake_or_ai_generated"))
-
-        reason = verdict.get("reason", "")
-
-        passed = (
-            is_garbage
-            and confidence >= GEMINI_CONFIDENCE_THRESHOLD
-            and not looks_fake
-        )
-
-        print(
-            f"[gemini] is_garbage={is_garbage} confidence={confidence} "
-            f"looks_fake={looks_fake} passed={passed} reason={reason!r}"
-        )
-
-        return {"passed": passed, "reason": reason}
-
-    except Exception as error:
-        # Fail open — don't block real reports over an API hiccup.
-        print(f"[gemini] ERROR — failing open: {error}")
-        return {"passed": True, "reason": "Gemini check unavailable."}
 
 
 # -----------------------------------------------------------
@@ -991,37 +828,6 @@ def submit():
     original_name = secure_filename(image.filename)
 
     extension = original_name.rsplit(".", 1)[1].lower()
-
-    image_bytes = image.read()
-
-    if not contains_garbage(image_bytes):
-
-        flash(
-            "We couldn't spot any garbage/litter in that photo. "
-            "Please upload a clear photo of the actual garbage."
-        )
-
-        return redirect(url_for("home"))
-
-    mime_type = f"image/{extension}" if extension != "jpg" else "image/jpeg"
-
-    gemini_result = verify_with_gemini(image_bytes, mime_type)
-
-    if not gemini_result["passed"]:
-
-        flash(
-            "Our AI verification couldn't confirm this is a genuine "
-            "garbage photo. "
-            + (gemini_result["reason"] or "")
-            + " Please upload an original, unedited photo of the "
-            "actual garbage."
-        )
-
-        return redirect(url_for("home"))
-
-    # Reset stream position, then upload (contains_garbage already
-    # consumed the bytes for the API check above).
-    image.stream.seek(0)
 
     image_url = upload_image_to_storage(image, extension)
 
