@@ -119,8 +119,8 @@ if cred_path:
 else:
     # Cloud Run / any environment with Application Default Credentials
     firebase_admin.initialize_app()
-
-db = firestore.client()
+    
+db = firestore.client(database_id="")
 
 
 # -----------------------------------------------------------
