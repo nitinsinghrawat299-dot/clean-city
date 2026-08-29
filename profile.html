@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}My Profile — SPR{% endblock %}
+
+{% block content %}
+<section style="padding:44px 0;">
+  <div class="wrap">
+
+    <div class="card card-lg" style="margin-bottom:24px;">
+      <div class="profile-head">
+        <div class="profile-avatar">{{ user.username[:1] | upper }}</div>
+        <div style="flex:1; min-width:200px;">
+          <div class="profile-name">{{ user.username }}</div>
+          <div class="profile-meta">{{ user.email }}</div>
+        </div>
+        <div style="text-align:center;">
+          <div class="ic" style="font-size:2rem;">{{ badge_icon }}</div>
+          <div style="font-size:.82rem; color:var(--text-muted); margin-top:2px;">{{ badge_name }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat-chip"><div class="num">{{ user.points | default(0) }}</div><div class="label">Total Points</div></div>
+      <div class="stat-chip"><div class="num">{{ total }}</div><div class="label">Reports Submitted</div></div>
+      <div class="stat-chip"><div class="num">{{ resolved }}</div><div class="label">Reports Resolved</div></div>
+      <div class="stat-chip"><div class="num">{{ total - resolved }}</div><div class="label">Still Pending</div></div>
+    </div>
+
+    <div class="dash-grid">
+      <div class="card">
+        <h3 style="font-size:1.1rem; margin-bottom:18px;">My Reports</h3>
+
+        {% if complaints %}
+          <div class="activity-list">
+            {% for c in complaints %}
+              <div class="activity-item">
+                {% if c.image %}
+                  <img src="{{ c.image }}" class="activity-thumb" alt="Report photo">
+                {% else %}
+                  <div class="activity-thumb"></div>
+                {% endif %}
+                <div class="activity-body" style="flex:1;">
+                  <h4>{{ c.description[:80] }}{{ '…' if c.description|length > 80 }}</h4>
+                  <p>📍 {{ c.location }}{% if c.address %} · {{ c.address }}{% endif %}</p>
+                  {% if c.status == 'Denied' and c.denial_reason %}
+                    <p style="color:#ff9a9d;">Denied: {{ c.denial_reason }}</p>
+                  {% endif %}
+                </div>
+                <span class="status status-{{ c.status | lower | replace(' ', '') }}">{{ c.status }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-state">
+            <div class="ic">🌱</div>
+            <p>You haven't submitted any reports yet.</p>
+            <a href="{{ url_for('home') }}" class="btn btn-primary" style="margin-top:14px;">Report an Issue</a>
+          </div>
+        {% endif %}
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:20px;">
+        <div class="card">
+          <h3 style="font-size:1.05rem; margin-bottom:6px;">Current Badge</h3>
+          <div class="achv-grid">
+            <div class="achv-card">
+              <div class="ic">{{ badge_icon }}</div>
+              <h5>{{ badge_name }}</h5>
+              <p>{{ user.points | default(0) }} pts</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="border-color:rgba(229,72,77,.25);">
+          <h3 style="font-size:1rem; margin-bottom:8px; color:#ff9a9d;">Delete Account</h3>
+          <p style="color:var(--text-muted); font-size:.85rem; margin-bottom:14px;">This permanently deletes your account. This cannot be undone.</p>
+          <form method="POST" action="{{ url_for('delete_account') }}" onsubmit="return confirm('Are you sure? This cannot be undone.');">
+            <div class="field">
+              <label for="delete_password">Confirm your password</label>
+              <input type="password" id="delete_password" name="password" required placeholder="Enter your password">
+            </div>
+            <button type="submit" class="btn btn-danger btn-block">Delete My Account</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

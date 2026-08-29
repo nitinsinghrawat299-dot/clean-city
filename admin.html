@@ -1,0 +1,96 @@
+{% extends "base_admin.html" %}
+{% block title %}Manage Reports — SPR Admin{% endblock %}
+
+{% block content %}
+{% set resolved_count = complaints | selectattr('status','equalto','Resolved') | list | length %}
+{% set denied_count = complaints | selectattr('status','equalto','Denied') | list | length %}
+{% set pending_count = complaints | length - resolved_count - denied_count %}
+
+<div class="admin-topbar">
+  <div>
+    <h1>Manage Reports</h1>
+    <p>View and manage all reported issues.</p>
+  </div>
+  <input type="text" class="search-input" id="reportSearch" placeholder="Search reports…" onkeyup="filterReports()">
+</div>
+
+<div class="admin-stat-grid">
+  <div class="stat-chip"><div class="num">{{ complaints | length }}</div><div class="label">Total Reports</div></div>
+  <div class="stat-chip"><div class="num">{{ resolved_count }}</div><div class="label">Resolved</div></div>
+  <div class="stat-chip"><div class="num">{{ pending_count }}</div><div class="label">Pending</div></div>
+  <div class="stat-chip"><div class="num">{{ denied_count }}</div><div class="label">Denied</div></div>
+</div>
+
+{% if complaints %}
+<div style="overflow-x:auto;">
+  <table class="data-table" id="reportsTable">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Citizen</th>
+        <th>Issue</th>
+        <th>Location</th>
+        <th>Status</th>
+        <th>Reported</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in complaints %}
+        <tr>
+          <td>#{{ '%03d' % c.report_number if c.report_number else c.id[:6] }}</td>
+          <td>{{ c.citizen_username or c.name or '—' }}</td>
+          <td style="max-width:220px;">
+            {% if c.image %}<a href="{{ c.image }}" target="_blank" rel="noopener">🖼️</a>{% endif %}
+            {{ c.description[:60] }}{{ '…' if c.description and c.description|length > 60 }}
+          </td>
+          <td>{{ c.location }}</td>
+          <td><span class="status status-{{ c.status | lower | replace(' ', '') }}">{{ c.status }}</span></td>
+          <td>{{ c.created_at.strftime('%d %b %Y') if c.created_at else '—' }}</td>
+          <td>
+            <div class="row-actions">
+              <form method="POST" action="{{ url_for('update_status', complaint_id=c.id) }}" class="status-form" style="display:flex; gap:6px; align-items:center;">
+                <select name="status" class="search-input" style="min-width:120px; padding:6px 10px;" onchange="toggleReason(this)">
+                  <option value="Reported" {{ 'selected' if c.status=='Reported' }}>Reported</option>
+                  <option value="In Progress" {{ 'selected' if c.status=='In Progress' }}>In Progress</option>
+                  <option value="Resolved" {{ 'selected' if c.status=='Resolved' }}>Resolved</option>
+                  <option value="Denied" {{ 'selected' if c.status=='Denied' }}>Denied</option>
+                </select>
+                <input type="text" name="reason" placeholder="Reason (if denying)" class="search-input" style="display:none; min-width:140px; padding:6px 10px;">
+                <button type="submit" class="icon-btn" title="Update status">✔</button>
+              </form>
+              <form method="POST" action="{{ url_for('delete_complaint', complaint_id=c.id) }}" onsubmit="return confirm('Delete this report permanently?');">
+                <button type="submit" class="icon-btn danger" title="Delete report">🗑</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state">
+  <div class="ic">📭</div>
+  <p>No reports yet. New citizen reports will show up here.</p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  function toggleReason(select) {
+    const row = select.closest('.status-form');
+    const reasonInput = row.querySelector('input[name="reason"]');
+    reasonInput.style.display = select.value === 'Denied' ? 'block' : 'none';
+    reasonInput.required = select.value === 'Denied';
+  }
+
+  function filterReports() {
+    const q = document.getElementById('reportSearch').value.toLowerCase();
+    document.querySelectorAll('#reportsTable tbody tr').forEach(row => {
+      row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+  }
+</script>
+{% endblock %}
