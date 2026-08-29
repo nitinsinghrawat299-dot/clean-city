@@ -23,9 +23,9 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 import urllib.parse
-from google.cloud import firestore
+import firebase_admin
+from firebase_admin import credentials, firestore
 from google.cloud.firestore_v1 import Increment
-from google.oauth2 import service_account
 import cloudinary
 import cloudinary.uploader
 
@@ -99,11 +99,7 @@ def is_reserved_username(username):
 
 
 # -----------------------------------------------------------
-# FIRESTORE (database) — connects directly via google-cloud-firestore
-# rather than through the firebase_admin wrapper. This sidesteps a
-# class of "Invalid database id (default)" errors some deployments hit
-# with the firebase_admin abstraction layer, especially under Gunicorn
-# with multiple workers.
+# FIREBASE — Firestore (database)
 # -----------------------------------------------------------
 #
 # Locally: set GOOGLE_APPLICATION_CREDENTIALS in your .env to the path
@@ -116,17 +112,13 @@ def is_reserved_username(username):
 cred_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
 
 if cred_path:
-    gcp_credentials = service_account.Credentials.from_service_account_file(
-        cred_path
-    )
-    db = firestore.Client(
-        credentials=gcp_credentials,
-        project=gcp_credentials.project_id,
-        database="(default)"
-    )
+    cred = credentials.Certificate(cred_path)
+    firebase_admin.initialize_app(cred)
 else:
     # Cloud Run / any environment with Application Default Credentials
-    db = firestore.Client(database="(default)")
+    firebase_admin.initialize_app()
+
+db = firestore.client()
 
 
 # -----------------------------------------------------------
@@ -253,6 +245,61 @@ cloudinary.config(
 
 
 # -----------------------------------------------------------
+# GARBAGE IMAGE CHECK — uses Roboflow's free garbage-detection
+# model so citizens can't upload random / unrelated photos.
+# -----------------------------------------------------------
+
+ROBOFLOW_API_KEY = os.environ.get("ROBOFLOW_API_KEY")
+
+ROBOFLOW_MODEL_ID = os.environ.get(
+    "ROBOFLOW_MODEL_ID",
+    "garbage_detection-wvzwv/9"
+)
+
+GARBAGE_CONFIDENCE_THRESHOLD = 0.35
+
+
+def contains_garbage(image_bytes):
+    """
+    Sends the uploaded image bytes to the Roboflow garbage-detection API.
+
+    Returns True if garbage/litter is detected with confidence above
+    the threshold, False otherwise. Fails open (returns True) if the
+    API key isn't set or the call fails, so a temporary outage never
+    blocks citizens from submitting real reports.
+    """
+
+    if not ROBOFLOW_API_KEY:
+        return True
+
+    try:
+        response = requests.post(
+            f"https://detect.roboflow.com/{ROBOFLOW_MODEL_ID}",
+            params={
+                "api_key": ROBOFLOW_API_KEY,
+                "confidence": int(GARBAGE_CONFIDENCE_THRESHOLD * 100),
+            },
+            files={"file": image_bytes},
+            timeout=10,
+        )
+
+        response.raise_for_status()
+
+        result = response.json()
+
+        predictions = result.get("predictions", [])
+
+        for prediction in predictions:
+            if prediction.get("confidence", 0) >= GARBAGE_CONFIDENCE_THRESHOLD:
+                return True
+
+        return False
+
+    except Exception:
+        return True
+
+
+# -----------------------------------------------------------
 # UPLOADS — restricted to image types, capped in size
 # -----------------------------------------------------------
 
@@ -319,27 +366,40 @@ def get_badge(points):
 @app.route("/")
 def home():
 
-    if not session.get("citizen_id"):
+    if session.get("citizen_id"):
 
-        return redirect(url_for("citizen_login"))
+        return render_template("index.html")
 
-    citizen_id = session["citizen_id"]
+    # Not logged in -> public landing page (visitors haven't signed up
+    # yet), instead of bouncing them straight to the login form.
+    #
+    # reports_count reuses the same counter document that assigns
+    # report numbers, so it's a single cheap doc read rather than
+    # streaming the whole "complaints" collection.
 
-    user_doc = db.collection("users").document(citizen_id).get()
+    counter_snapshot = _report_counter_ref.get()
 
-    active_warning = None
+    reports_count = counter_snapshot.get("value") if counter_snapshot.exists else 0
 
-    if user_doc.exists:
+    user_docs = list(db.collection("users").stream())
 
-        user = user_doc.to_dict()
+    users_count = len(user_docs)
 
-        if user.get("warning_message") and not user.get(
-            "warning_acknowledged", True
-        ):
+    points_total = sum(doc.to_dict().get("points", 0) for doc in user_docs)
 
-            active_warning = user["warning_message"]
+    # "Clean Areas" on the landing page = reports that reached Resolved.
+    resolved_count = len(list(
+        db.collection("complaints").where("status", "==", "Resolved").stream()
+    ))
 
-    return render_template("index.html", active_warning=active_warning)
+    stats = {
+        "reports": f"{reports_count:,}",
+        "users": f"{users_count:,}",
+        "points": f"{points_total:,}",
+        "areas": f"{resolved_count:,}",
+    }
+
+    return render_template("landing.html", stats=stats)
 
 
 # =========================================================
@@ -420,9 +480,6 @@ def register():
             "points": 0,
             "reset_token": None,
             "reset_token_expires": None,
-            "warning_message": None,
-            "warning_issued_at": None,
-            "warning_acknowledged": True,
             "created_at": firestore.SERVER_TIMESTAMP
         })
 
@@ -829,6 +886,21 @@ def submit():
 
     extension = original_name.rsplit(".", 1)[1].lower()
 
+    image_bytes = image.read()
+
+    if not contains_garbage(image_bytes):
+
+        flash(
+            "We couldn't spot any garbage/litter in that photo. "
+            "Please upload a clear photo of the actual garbage."
+        )
+
+        return redirect(url_for("home"))
+
+    # Reset stream position, then upload (contains_garbage already
+    # consumed the bytes for the API check above).
+    image.stream.seek(0)
+
     image_url = upload_image_to_storage(image, extension)
 
     report_number = get_next_report_number()
@@ -1005,84 +1077,6 @@ def admin_delete_user(user_id):
     flash("🗑️ Citizen account deleted.")
 
     return redirect(url_for("admin_users"))
-
-
-@app.route("/admin/warn-user/<user_id>", methods=["POST"])
-def admin_warn_user(user_id):
-
-    if not session.get("admin_logged_in"):
-
-        return redirect(url_for("login"))
-
-    warning_message = request.form.get("warning_message", "").strip()
-
-    if not warning_message:
-
-        flash("Please write a warning message before sending.")
-
-        return redirect(url_for("admin_users"))
-
-    user_ref = db.collection("users").document(user_id)
-
-    user_doc = user_ref.get()
-
-    if not user_doc.exists:
-
-        flash("That account no longer exists.")
-
-        return redirect(url_for("admin_users"))
-
-    user = user_doc.to_dict()
-
-    user_ref.update({
-        "warning_message": warning_message,
-        "warning_issued_at": firestore.SERVER_TIMESTAMP,
-        "warning_acknowledged": False
-    })
-
-    email = user.get("email")
-
-    if email:
-
-        send_email(
-            to_email=email,
-            subject="⚠️ Warning from CleanCity Municipality",
-            body_text=(
-                f"Hi {user.get('username', 'Citizen')},\n\n"
-                "The CleanCity municipality team has issued a warning "
-                "on your account:\n\n"
-                f'"{warning_message}"\n\n'
-                "Please log in and acknowledge this warning. If the "
-                "issue isn't resolved, your account may be deleted.\n\n"
-                "— CleanCity Municipality"
-            )
-        )
-
-    flash(f"⚠️ Warning sent to {user.get('username', 'the citizen')}.")
-
-    return redirect(url_for("admin_users"))
-
-
-# =========================================================
-# ACKNOWLEDGE WARNING (citizen)
-# =========================================================
-
-@app.route("/acknowledge-warning", methods=["POST"])
-def acknowledge_warning():
-
-    if not session.get("citizen_id"):
-
-        return redirect(url_for("citizen_login"))
-
-    citizen_id = session["citizen_id"]
-
-    db.collection("users").document(citizen_id).update({
-        "warning_acknowledged": True
-    })
-
-    flash("Thanks for acknowledging the warning.")
-
-    return redirect(request.referrer or url_for("home"))
 
 
 # =========================================================
