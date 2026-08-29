@@ -1,357 +1,96 @@
-<!DOCTYPE html>
-<html lang="en">
+{% extends "base_admin.html" %}
+{% block title %}Manage Reports — SPR Admin{% endblock %}
 
-<head>
+{% block content %}
+{% set resolved_count = complaints | selectattr('status','equalto','Resolved') | list | length %}
+{% set denied_count = complaints | selectattr('status','equalto','Denied') | list | length %}
+{% set pending_count = complaints | length - resolved_count - denied_count %}
 
-    <meta charset="UTF-8">
+<div class="admin-topbar">
+  <div>
+    <h1>Manage Reports</h1>
+    <p>View and manage all reported issues.</p>
+  </div>
+  <input type="text" class="search-input" id="reportSearch" placeholder="Search reports…" onkeyup="filterReports()">
+</div>
 
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
-    <title>Municipality Dashboard</title>
-
-    <link
-        rel="stylesheet"
-        href="{{ url_for('static', filename='style.css') }}"
-    >
-
-</head>
-
-
-<body>
-
-
-<nav>
-
-    <h2>
-        🏛️ CleanCity Municipality
-    </h2>
-
-
-    <div>
-
-        <a href="/">
-            Citizen Portal
-        </a>
-
-        <a href="/admin/users">
-            👥 Manage Citizens
-        </a>
-
-        <a href="/leaderboard">
-            Leaderboard
-        </a>
-
-        <a href="/logout">
-            Logout
-        </a>
-
-    </div>
-
-</nav>
-
-
-<main>
-
-
-<section class="hero">
-
-    <h1>
-        Municipality Dashboard
-    </h1>
-
-    <p>
-        Verify reports and keep the city clean.
-    </p>
-
-</section>
-
-
-<section class="complaints">
-
+<div class="admin-stat-grid">
+  <div class="stat-chip"><div class="num">{{ complaints | length }}</div><div class="label">Total Reports</div></div>
+  <div class="stat-chip"><div class="num">{{ resolved_count }}</div><div class="label">Resolved</div></div>
+  <div class="stat-chip"><div class="num">{{ pending_count }}</div><div class="label">Pending</div></div>
+  <div class="stat-chip"><div class="num">{{ denied_count }}</div><div class="label">Denied</div></div>
+</div>
 
 {% if complaints %}
-
-
-{% for complaint in complaints %}
-
-
-<div class="complaint-card">
-
-
-    <div class="complaint-header">
-
-        <h2>
-            Complaint #{{ complaint["report_number"] or "—" }}
-        </h2>
-
-
-        <span class="status">
-            {{ complaint["status"] }}
-        </span>
-
-    </div>
-
-
-    {% if complaint["image"] %}
-
-    <img
-        src="{{ complaint['image'] }}"
-        class="garbage-image"
-        alt="Garbage Image"
-    >
-
-    {% endif %}
-
-
-    <div class="location-box">
-
-
-        <h3>
-            📍 Location
-        </h3>
-
-
-        <p class="address">
-
-            {{ complaint["address"] or complaint["location"] }}
-
-        </p>
-
-
-        {% if complaint["coordinates"] %}
-
-
-        {% set coords = complaint["coordinates"].split(',') %}
-
-
-        {% if coords|length == 2 %}
-
-        <a
-            href="https://www.google.com/maps?q={{ coords[0] }},{{ coords[1] }}"
-            target="_blank"
-            class="map-button"
-        >
-            🗺️ Open in Google Maps
-        </a>
-
-        {% endif %}
-
-
-        {% endif %}
-
-
-    </div>
-
-
-    <div class="complaint-info">
-
-
-        <p>
-
-            👤
-
-            <strong>
-                Citizen:
-            </strong>
-
-            {{ complaint["citizen_username"] or "Unknown" }}
-
-        </p>
-
-
-        <p>
-
-            📝
-
-            <strong>
-                Description:
-            </strong>
-
-
-            {% if complaint["description"] %}
-
-                {{ complaint["description"] }}
-
-            {% else %}
-
-                <span class="no-description">
-                    No description provided.
-                </span>
-
-            {% endif %}
-
-        </p>
-
-
-        {% if complaint["coordinates"] %}
-
-        <p class="coordinates">
-
-            📍 GPS:
-            {{ complaint["coordinates"] }}
-
-        </p>
-
-        {% endif %}
-
-
-        {% if complaint["points_awarded"] > 0 %}
-
-        <p class="earned">
-
-            ⭐ {{ complaint["points_awarded"] }}
-            points already awarded
-
-        </p>
-
-        {% endif %}
-
-
-        {% if complaint["status"] == "Denied" and complaint["denial_reason"] %}
-
-        <p class="denied-reason">
-
-            ⛔ <strong>Denied:</strong>
-            {{ complaint["denial_reason"] }}
-
-        </p>
-
-        {% endif %}
-
-
-    </div>
-
-
-    <form
-        action="/update/{{ complaint['id'] }}"
-        method="POST"
-        class="status-form"
-    >
-
-
-        <label>
-            Status:
-        </label>
-
-
-        <select name="status">
-
-
-            <option
-                value="Reported"
-                {% if complaint["status"] == "Reported" %}
-                selected
-                {% endif %}
-            >
-                🔴 Reported
-            </option>
-
-
-            <option
-                value="In Progress"
-                {% if complaint["status"] == "In Progress" %}
-                selected
-                {% endif %}
-            >
-                🟡 In Progress
-            </option>
-
-
-            <option
-                value="Resolved"
-                {% if complaint["status"] == "Resolved" %}
-                selected
-                {% endif %}
-            >
-                🟢 Resolved
-            </option>
-
-
-            <option
-                value="Denied"
-                {% if complaint["status"] == "Denied" %}
-                selected
-                {% endif %}
-            >
-                ⛔ Denied
-            </option>
-
-
-        </select>
-
-
-        <input
-            type="text"
-            name="reason"
-            placeholder="Reason (only needed if denying)"
-            value="{{ complaint['denial_reason'] or '' }}"
-            class="deny-reason-input"
-        >
-
-
-        <button type="submit">
-            Update Status
-        </button>
-
-
-    </form>
-
-
-    <form
-        action="/delete/{{ complaint['id'] }}"
-        method="POST"
-        class="delete-form"
-        onsubmit="return confirm('Delete report #{{ complaint['report_number'] or complaint['id'] }}? This cannot be undone.');"
-    >
-
-        <button type="submit" class="delete-button">
-            🗑️ Delete Report
-        </button>
-
-    </form>
-
-
+<div style="overflow-x:auto;">
+  <table class="data-table" id="reportsTable">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Citizen</th>
+        <th>Issue</th>
+        <th>Location</th>
+        <th>Status</th>
+        <th>Reported</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in complaints %}
+        <tr>
+          <td>#{{ '%03d' % c.report_number if c.report_number else c.id[:6] }}</td>
+          <td>{{ c.citizen_username or c.name or '—' }}</td>
+          <td style="max-width:220px;">
+            {% if c.image %}<a href="{{ c.image }}" target="_blank" rel="noopener">🖼️</a>{% endif %}
+            {{ c.description[:60] }}{{ '…' if c.description and c.description|length > 60 }}
+          </td>
+          <td>{{ c.location }}</td>
+          <td><span class="status status-{{ c.status | lower | replace(' ', '') }}">{{ c.status }}</span></td>
+          <td>{{ c.created_at.strftime('%d %b %Y') if c.created_at else '—' }}</td>
+          <td>
+            <div class="row-actions">
+              <form method="POST" action="{{ url_for('update_status', complaint_id=c.id) }}" class="status-form" style="display:flex; gap:6px; align-items:center;">
+                <select name="status" class="search-input" style="min-width:120px; padding:6px 10px;" onchange="toggleReason(this)">
+                  <option value="Reported" {{ 'selected' if c.status=='Reported' }}>Reported</option>
+                  <option value="In Progress" {{ 'selected' if c.status=='In Progress' }}>In Progress</option>
+                  <option value="Resolved" {{ 'selected' if c.status=='Resolved' }}>Resolved</option>
+                  <option value="Denied" {{ 'selected' if c.status=='Denied' }}>Denied</option>
+                </select>
+                <input type="text" name="reason" placeholder="Reason (if denying)" class="search-input" style="display:none; min-width:140px; padding:6px 10px;">
+                <button type="submit" class="icon-btn" title="Update status">✔</button>
+              </form>
+              <form method="POST" action="{{ url_for('delete_complaint', complaint_id=c.id) }}" onsubmit="return confirm('Delete this report permanently?');">
+                <button type="submit" class="icon-btn danger" title="Delete report">🗑</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </div>
-
-
-{% endfor %}
-
-
 {% else %}
-
-
-<div class="empty">
-
-    <h2>
-        🎉 No complaints
-    </h2>
-
-    <p>
-        There are currently no garbage reports.
-    </p>
-
+<div class="empty-state">
+  <div class="ic">📭</div>
+  <p>No reports yet. New citizen reports will show up here.</p>
 </div>
-
-
 {% endif %}
+{% endblock %}
 
+{% block extra_scripts %}
+<script>
+  function toggleReason(select) {
+    const row = select.closest('.status-form');
+    const reasonInput = row.querySelector('input[name="reason"]');
+    reasonInput.style.display = select.value === 'Denied' ? 'block' : 'none';
+    reasonInput.required = select.value === 'Denied';
+  }
 
-</section>
-
-
-</main>
-
-
-<footer>
-
-    CleanCity © 2026
-
-</footer>
-
-
-</body>
-
-</html>
+  function filterReports() {
+    const q = document.getElementById('reportSearch').value.toLowerCase();
+    document.querySelectorAll('#reportsTable tbody tr').forEach(row => {
+      row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+  }
+</script>
+{% endblock %}
