@@ -366,11 +366,40 @@ def get_badge(points):
 @app.route("/")
 def home():
 
-    if not session.get("citizen_id"):
+    if session.get("citizen_id"):
 
-        return redirect(url_for("citizen_login"))
+        return render_template("index.html")
 
-    return render_template("index.html")
+    # Not logged in -> public landing page (visitors haven't signed up
+    # yet), instead of bouncing them straight to the login form.
+    #
+    # reports_count reuses the same counter document that assigns
+    # report numbers, so it's a single cheap doc read rather than
+    # streaming the whole "complaints" collection.
+
+    counter_snapshot = _report_counter_ref.get()
+
+    reports_count = counter_snapshot.get("value") if counter_snapshot.exists else 0
+
+    user_docs = list(db.collection("users").stream())
+
+    users_count = len(user_docs)
+
+    points_total = sum(doc.to_dict().get("points", 0) for doc in user_docs)
+
+    # "Clean Areas" on the landing page = reports that reached Resolved.
+    resolved_count = len(list(
+        db.collection("complaints").where("status", "==", "Resolved").stream()
+    ))
+
+    stats = {
+        "reports": f"{reports_count:,}",
+        "users": f"{users_count:,}",
+        "points": f"{points_total:,}",
+        "areas": f"{resolved_count:,}",
+    }
+
+    return render_template("landing.html", stats=stats)
 
 
 # =========================================================
