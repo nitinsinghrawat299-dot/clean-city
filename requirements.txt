@@ -1,7 +1,0 @@
-Flask
-python-dotenv
-requests
-google-cloud-firestore==2.16.1
-google-auth
-cloudinary
-gunicorn
