@@ -838,6 +838,14 @@ def leaderboard():
         users=leaderboard_data
     )
 
+# =========================================================
+# ABOUT PAURI GARHWAL — informational page
+# =========================================================
+
+@app.route("/pauri-garhwal")
+def pauri_garhwal():
+
+    return render_template("paurigarhwal.html")
 
 # =========================================================
 # SUBMIT COMPLAINT
