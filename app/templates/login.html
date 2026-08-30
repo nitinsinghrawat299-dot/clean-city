@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Municipality Login — SPR{% endblock %}
+
+{% block header %}
+<header class="site-header">
+  <nav class="site-nav">
+    <a href="{{ url_for('home') }}" class="logo">
+      <span class="logo-mark">🌱</span>
+      <span>SPR<small>Municipality Portal</small></span>
+    </a>
+  </nav>
+</header>
+{% endblock %}
+
+{% block content %}
+<section class="auth-shell">
+  <div class="auth-card">
+    <h1>Municipality Login</h1>
+    <p class="sub">Staff access to manage reports and citizen accounts.</p>
+
+    <form method="POST" action="{{ url_for('login') }}">
+      <div class="field">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" required autofocus placeholder="Municipality username">
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <div class="input-row">
+          <input type="password" id="password" name="password" required placeholder="Enter password">
+          <button type="button" class="toggle-visibility" onclick="const f=document.getElementById('password'); f.type = f.type==='password' ? 'text' : 'password'; this.textContent = f.type==='password' ? '👁️' : '🙈';">👁️</button>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block" style="margin-top:8px;">Login</button>
+    </form>
+
+    <p class="auth-footer"><a href="{{ url_for('home') }}">← Back to citizen site</a></p>
+  </div>
+</section>
+{% endblock %}
+
+{% block footer %}{% endblock %}

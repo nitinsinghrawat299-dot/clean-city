@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Report an Issue — SPR{% endblock %}
+
+{% block content %}
+<section style="padding:44px 0;">
+  <div class="wrap">
+    <div class="dash-header">
+      <h1>Report an Issue</h1>
+      <p>Help us keep {{ session.get('citizen_username', 'your') }}'s city clean by reporting issues you see, {{ session.get('citizen_username', 'citizen') }}.</p>
+    </div>
+
+    <div class="dash-grid">
+      <!-- REPORT FORM -->
+      <div class="card card-lg">
+        <form method="POST" action="{{ url_for('submit') }}" enctype="multipart/form-data" id="reportForm">
+
+          <div class="field">
+            <label for="description">Description</label>
+            <textarea id="description" name="description" maxlength="1000" required placeholder="Describe the issue — what did you find, and how bad is it?"></textarea>
+          </div>
+
+          <div class="field">
+            <label for="location">Location</label>
+            <input type="text" id="location" name="location" required placeholder="Enter a location or area name">
+          </div>
+
+          <div class="field">
+            <label for="address">Address <span style="font-weight:400; color:var(--text-muted);">(optional)</span></label>
+            <input type="text" id="address" name="address" placeholder="Nearest landmark or address">
+          </div>
+
+          <input type="hidden" id="coordinates" name="coordinates" value="">
+
+          <div class="field">
+            <label>Upload Photo</label>
+            <label class="upload-drop" id="dropLabel">
+              <input type="file" name="image" id="imageInput" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp" required>
+              <div id="dropText">☁️ Click to upload or drag and drop<br><span style="font-size:.78rem;">PNG, JPG up to 8MB — must clearly show the garbage/litter</span></div>
+            </label>
+            <div class="upload-preview" id="previewWrap">
+              <img id="previewImg" src="" alt="Preview">
+            </div>
+          </div>
+
+          <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:6px;">
+            <button type="submit" class="btn btn-primary">Submit Report</button>
+            <button type="button" class="btn btn-ghost" id="useLocationBtn">📍 Use My Location</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- QUICK LINKS / SIDEBAR -->
+      <div style="display:flex; flex-direction:column; gap:20px;">
+        <div class="card">
+          <h3 style="font-size:1.05rem; margin-bottom:14px;">Your account</h3>
+          <p style="color:var(--text-muted); font-size:.9rem; margin-bottom:18px;">Signed in as <strong style="color:var(--text-main);">{{ session.get('citizen_username','') }}</strong></p>
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            <a href="{{ url_for('profile') }}" class="btn btn-ghost btn-block">👤 View My Profile &amp; Reports</a>
+            <a href="{{ url_for('leaderboard') }}" class="btn btn-ghost btn-block">🏆 View Leaderboard</a>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 style="font-size:1.05rem; margin-bottom:10px;">Tips for a good report</h3>
+          <ul style="color:var(--text-muted); font-size:.88rem; padding-left:18px; display:flex; flex-direction:column; gap:8px;">
+            <li>Take the photo close enough that the garbage is clearly visible.</li>
+            <li>Use "Use My Location" so the municipality can find the exact spot.</li>
+            <li>Add a nearby landmark in Address if GPS isn't precise.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  const imageInput = document.getElementById('imageInput');
+  const previewWrap = document.getElementById('previewWrap');
+  const previewImg = document.getElementById('previewImg');
+  const dropText = document.getElementById('dropText');
+
+  imageInput.addEventListener('change', () => {
+    const file = imageInput.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      previewImg.src = e.target.result;
+      previewWrap.style.display = 'block';
+      dropText.innerHTML = '✅ ' + file.name;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  document.getElementById('useLocationBtn').addEventListener('click', () => {
+    const btn = document.getElementById('useLocationBtn');
+    if (!navigator.geolocation) {
+      alert('Location access is not supported by this browser.');
+      return;
+    }
+    btn.textContent = 'Locating…';
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        document.getElementById('coordinates').value =
+          pos.coords.latitude.toFixed(6) + ',' + pos.coords.longitude.toFixed(6);
+        btn.textContent = '📍 Location captured';
+      },
+      () => {
+        btn.textContent = '📍 Use My Location';
+        alert('Could not get your location. You can still fill in Location/Address manually.');
+      }
+    );
+  });
+</script>
+{% endblock %}

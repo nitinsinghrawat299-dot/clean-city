@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Login — SPR{% endblock %}
+
+{% block content %}
+<section class="auth-shell">
+  <div class="auth-card">
+    <h1>Welcome Back!</h1>
+    <p class="sub">Login to report garbage and track your SPR impact.</p>
+
+    <form method="POST" action="{{ url_for('citizen_login') }}">
+      <div class="field">
+        <label for="username">Username</label>
+        <div class="input-row">
+          <input type="text" id="username" name="username" value="{{ prefill_username }}" required autofocus placeholder="Enter your username">
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="password">Password</label>
+        <div class="input-row">
+          <input type="password" id="password" name="password" value="{{ prefill_password }}" required placeholder="Enter your password">
+          <button type="button" class="toggle-visibility" onclick="const f=document.getElementById('password'); f.type = f.type==='password' ? 'text' : 'password'; this.textContent = f.type==='password' ? '👁️' : '🙈';">👁️</button>
+        </div>
+      </div>
+
+      <div class="auth-links">
+        <span></span>
+        <a href="{{ url_for('forgot_password') }}">Forgot your password?</a>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block" style="margin-top:22px;">🚀 Login</button>
+    </form>
+
+    <p class="auth-footer">Don't have an account? <a href="{{ url_for('register') }}">Create one</a></p>
+  </div>
+</section>
+{% endblock %}
