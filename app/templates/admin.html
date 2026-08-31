@@ -27,6 +27,7 @@
     <thead>
       <tr>
         <th>#</th>
+        <th>Photo</th>
         <th>Citizen</th>
         <th>Issue</th>
         <th>Location</th>
@@ -39,16 +40,27 @@
       {% for c in complaints %}
         <tr>
           <td>#{{ '%03d' % c.report_number if c.report_number else c.id[:6] }}</td>
+          <td>
+            {% if c.image %}
+              <button type="button" class="report-thumb-btn" onclick="openReportPhoto('{{ c.image }}', '{{ c.location | e }}')" title="Click to view full photo">
+                <img src="{{ c.image }}" alt="Report photo" class="report-thumb" loading="lazy">
+              </button>
+            {% else %}
+              <div class="report-thumb report-thumb-empty">—</div>
+            {% endif %}
+          </td>
           <td>{{ c.citizen_username or c.name or '—' }}</td>
           <td style="max-width:220px;">
-            {% if c.image %}<a href="{{ c.image }}" target="_blank" rel="noopener">🖼️</a>{% endif %}
-            {{ c.description[:60] }}{{ '…' if c.description and c.description|length > 60 }}
+            {{ c.description[:60] if c.description else '(no description given)' }}{{ '…' if c.description and c.description|length > 60 }}
           </td>
           <td>{{ c.location }}</td>
           <td><span class="status status-{{ c.status | lower | replace(' ', '') }}">{{ c.status }}</span></td>
           <td>{{ c.created_at.strftime('%d %b %Y') if c.created_at else '—' }}</td>
           <td>
             <div class="row-actions">
+              {% if c.coordinates %}
+                <a href="https://www.google.com/maps?q={{ c.coordinates }}" target="_blank" rel="noopener" class="icon-btn" title="Open location in Google Maps">🗺️</a>
+              {% endif %}
               <form method="POST" action="{{ url_for('update_status', complaint_id=c.id) }}" class="status-form" style="display:flex; gap:6px; align-items:center;">
                 <select name="status" class="search-input" style="min-width:120px; padding:6px 10px;" onchange="toggleReason(this)">
                   <option value="Reported" {{ 'selected' if c.status=='Reported' }}>Reported</option>
@@ -75,6 +87,15 @@
   <p>No reports yet. New citizen reports will show up here.</p>
 </div>
 {% endif %}
+
+<!-- Lightbox for viewing a report's photo full-size -->
+<div class="photo-lightbox" id="photoLightbox" onclick="closeReportPhoto(event)">
+  <div class="photo-lightbox-inner">
+    <button type="button" class="photo-lightbox-close" onclick="closeReportPhoto(event)">✕</button>
+    <img id="photoLightboxImg" src="" alt="Report photo, full size">
+    <div class="photo-lightbox-caption" id="photoLightboxCaption"></div>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_scripts %}
@@ -91,6 +112,19 @@
     document.querySelectorAll('#reportsTable tbody tr').forEach(row => {
       row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
     });
+  }
+
+  function openReportPhoto(url, location) {
+    document.getElementById('photoLightboxImg').src = url;
+    document.getElementById('photoLightboxCaption').textContent = location || '';
+    document.getElementById('photoLightbox').classList.add('open');
+  }
+
+  function closeReportPhoto(e) {
+    if (e.target.id === 'photoLightbox' || e.target.classList.contains('photo-lightbox-close')) {
+      document.getElementById('photoLightbox').classList.remove('open');
+      document.getElementById('photoLightboxImg').src = '';
+    }
   }
 </script>
 {% endblock %}

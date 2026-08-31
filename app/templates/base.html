@@ -29,7 +29,11 @@
     <div class="nav-actions">
       {% if session.get('citizen_id') %}
         <a href="{{ url_for('profile') }}" class="nav-avatar" title="{{ session.get('citizen_username','') }}">
-          {{ session.get('citizen_username','?')[:1] | upper }}
+          {% if session.get('citizen_photo_url') %}
+            <img src="{{ session.get('citizen_photo_url') }}" alt="" class="nav-avatar-img">
+          {% else %}
+            {{ session.get('citizen_username','?')[:1] | upper }}
+          {% endif %}
         </a>
         <a href="{{ url_for('citizen_logout') }}" class="btn btn-ghost btn-sm">Logout</a>
       {% else %}
@@ -41,11 +45,14 @@
 </header>
 {% endblock %}
 
-{% with messages = get_flashed_messages() %}
+{% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}
-    <div class="flash-wrap">
-      {% for message in messages %}
-        <div class="flash">{{ message }}</div>
+    <div class="flash-wrap" id="flashWrap">
+      {% for category, message in messages %}
+        <div class="flash flash-{{ category }}">
+          <span class="flash-icon">{{ '⚠️' if category == 'error' else ('✅' if category == 'success' else 'ℹ️') }}</span>
+          <span>{{ message }}</span>
+        </div>
       {% endfor %}
     </div>
   {% endif %}
@@ -67,9 +74,15 @@
         <p style="color:var(--text-muted); font-size:.88rem; max-width:280px;">Helping citizens of the Garhwal Himalayas report and track local cleanliness issues, one pin at a time.</p>
         <div class="social-row">
           <!-- Confirm these should be the project's official accounts before publishing -->
-          <a href="#" aria-label="Facebook">f</a>
-          <a href="#" aria-label="Instagram">ig</a>
-          <a href="#" aria-label="YouTube">yt</a>
+          <a href="#" aria-label="Facebook">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M22 12.06C22 6.51 17.52 2 12 2S2 6.51 2 12.06c0 5.02 3.66 9.18 8.44 9.94v-7.03H7.9v-2.91h2.54V9.85c0-2.51 1.49-3.9 3.77-3.9 1.09 0 2.24.2 2.24.2v2.46h-1.26c-1.24 0-1.63.77-1.63 1.56v1.89h2.78l-.44 2.91h-2.34V22c4.78-.76 8.44-4.92 8.44-9.94z"/></svg>
+          </a>
+          <a href="#" aria-label="Instagram">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 2c2.72 0 3.06.01 4.12.06 1.06.05 1.79.22 2.43.47.66.26 1.22.6 1.77 1.15.55.55.9 1.11 1.15 1.77.25.64.42 1.37.47 2.43C21.99 8.94 22 9.28 22 12s-.01 3.06-.06 4.12c-.05 1.06-.22 1.79-.47 2.43a4.9 4.9 0 0 1-1.15 1.77 4.9 4.9 0 0 1-1.77 1.15c-.64.25-1.37.42-2.43.47C15.06 21.99 14.72 22 12 22s-3.06-.01-4.12-.06c-1.06-.05-1.79-.22-2.43-.47a4.9 4.9 0 0 1-1.77-1.15 4.9 4.9 0 0 1-1.15-1.77c-.25-.64-.42-1.37-.47-2.43C2.01 15.06 2 14.72 2 12s.01-3.06.06-4.12c.05-1.06.22-1.79.47-2.43.26-.66.6-1.22 1.15-1.77A4.9 4.9 0 0 1 5.45.53C6.09.28 6.82.11 7.88.06 8.94.01 9.28 0 12 0Zm0 5a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm0 8.25A3.25 3.25 0 1 1 12 8.5a3.25 3.25 0 0 1 0 6.75ZM17.5 4.5a1.17 1.17 0 1 0 0 2.35 1.17 1.17 0 0 0 0-2.35Z"/></svg>
+          </a>
+          <a href="#" aria-label="YouTube">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M23.5 6.19a3.02 3.02 0 0 0-2.12-2.14C19.51 3.5 12 3.5 12 3.5s-7.51 0-9.38.55A3.02 3.02 0 0 0 .5 6.19 31.6 31.6 0 0 0 0 12a31.6 31.6 0 0 0 .5 5.81 3.02 3.02 0 0 0 2.12 2.14c1.87.55 9.38.55 9.38.55s7.51 0 9.38-.55a3.02 3.02 0 0 0 2.12-2.14A31.6 31.6 0 0 0 24 12a31.6 31.6 0 0 0-.5-5.81ZM9.6 15.6V8.4l6.27 3.6-6.27 3.6Z"/></svg>
+          </a>
         </div>
       </div>
       <div>

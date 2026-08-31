@@ -7,7 +7,17 @@
 
     <div class="card card-lg" style="margin-bottom:24px;">
       <div class="profile-head">
-        <div class="profile-avatar">{{ user.username[:1] | upper }}</div>
+        <form method="POST" action="{{ url_for('update_pfp') }}" enctype="multipart/form-data" id="pfpForm">
+          <label class="pfp-upload" title="Click to change your profile picture">
+            {% if user.photo_url %}
+              <img src="{{ user.photo_url }}" alt="Your profile picture" class="profile-avatar profile-avatar-img">
+            {% else %}
+              <div class="profile-avatar">{{ user.username[:1] | upper }}</div>
+            {% endif %}
+            <span class="pfp-upload-badge">📷</span>
+            <input type="file" name="pfp" id="pfpInput" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp" onchange="document.getElementById('pfpForm').submit();">
+          </label>
+        </form>
         <div style="flex:1; min-width:200px;">
           <div class="profile-name">{{ user.username }}</div>
           <div class="profile-meta">{{ user.email }}</div>

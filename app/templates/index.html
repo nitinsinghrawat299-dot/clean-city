@@ -10,42 +10,64 @@
     </div>
 
     <div class="dash-grid">
-      <!-- REPORT FORM -->
+      <!-- REPORT FORM — follows the SPR steps: Snap, Pin, Report -->
       <div class="card card-lg">
         <form method="POST" action="{{ url_for('submit') }}" enctype="multipart/form-data" id="reportForm">
 
-          <div class="field">
-            <label for="description">Description</label>
-            <textarea id="description" name="description" maxlength="1000" required placeholder="Describe the issue — what did you find, and how bad is it?"></textarea>
-          </div>
-
-          <div class="field">
-            <label for="location">Location</label>
-            <input type="text" id="location" name="location" required placeholder="Enter a location or area name">
-          </div>
-
-          <div class="field">
-            <label for="address">Address <span style="font-weight:400; color:var(--text-muted);">(optional)</span></label>
-            <input type="text" id="address" name="address" placeholder="Nearest landmark or address">
-          </div>
-
-          <input type="hidden" id="coordinates" name="coordinates" value="">
-
-          <div class="field">
-            <label>Upload Photo</label>
-            <label class="upload-drop" id="dropLabel">
-              <input type="file" name="image" id="imageInput" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp" required>
-              <div id="dropText">☁️ Click to upload or drag and drop<br><span style="font-size:.78rem;">PNG, JPG up to 8MB — must clearly show the garbage/litter</span></div>
-            </label>
-            <div class="upload-preview" id="previewWrap">
-              <img id="previewImg" src="" alt="Preview">
+          <div class="spr-step">
+            <div class="spr-step-head">
+              <span class="spr-step-num">1</span>
+              <div>
+                <h3>Snap</h3>
+                <p>Take a clear photo of the issue.</p>
+              </div>
+            </div>
+            <div class="field" style="margin-bottom:0;">
+              <label class="upload-drop" id="dropLabel">
+                <input type="file" name="image" id="imageInput" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp" required>
+                <div id="dropText">☁️ Click to upload or drag and drop<br><span style="font-size:.78rem;">PNG, JPG up to 8MB — must clearly show the garbage/litter</span></div>
+              </label>
+              <div class="upload-preview" id="previewWrap">
+                <img id="previewImg" src="" alt="Preview">
+              </div>
             </div>
           </div>
 
-          <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:6px;">
-            <button type="submit" class="btn btn-primary">Submit Report</button>
+          <div class="spr-step">
+            <div class="spr-step-head">
+              <span class="spr-step-num">2</span>
+              <div>
+                <h3>Pin</h3>
+                <p>Tell us exactly where it is.</p>
+              </div>
+            </div>
+            <div class="field">
+              <label for="location">Location</label>
+              <input type="text" id="location" name="location" required placeholder="Enter a location or area name">
+            </div>
+            <div class="field">
+              <label for="address">Address <span style="font-weight:400; color:var(--text-muted);">(optional)</span></label>
+              <input type="text" id="address" name="address" placeholder="Nearest landmark or address">
+            </div>
+            <input type="hidden" id="coordinates" name="coordinates" value="">
             <button type="button" class="btn btn-ghost" id="useLocationBtn">📍 Use My Location</button>
           </div>
+
+          <div class="spr-step">
+            <div class="spr-step-head">
+              <span class="spr-step-num">3</span>
+              <div>
+                <h3>Report</h3>
+                <p>Add any extra detail, then send it in.</p>
+              </div>
+            </div>
+            <div class="field" style="margin-bottom:0;">
+              <label for="description">Description <span style="font-weight:400; color:var(--text-muted);">(optional)</span></label>
+              <textarea id="description" name="description" maxlength="1000" placeholder="Anything the municipality should know? (optional)"></textarea>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-block" style="margin-top:8px;">Submit Report</button>
         </form>
       </div>
 

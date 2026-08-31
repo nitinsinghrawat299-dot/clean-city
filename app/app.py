@@ -199,13 +199,27 @@ def send_email(to_email, subject, body_text):
 
         context = ssl.create_default_context()
 
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+        # Port 465 = implicit SSL from the start (no STARTTLS step).
+        # Port 587 (the common default) = plain connection, then
+        # upgrade to TLS with STARTTLS. Using the wrong one for your
+        # provider's port is a common reason emails silently fail.
+        if SMTP_PORT == 465:
 
-            server.starttls(context=context)
+            with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, context=context) as server:
 
-            server.login(SMTP_USERNAME, SMTP_PASSWORD)
+                server.login(SMTP_USERNAME, SMTP_PASSWORD)
 
-            server.sendmail(EMAIL_FROM, [to_email], message.as_string())
+                server.sendmail(EMAIL_FROM, [to_email], message.as_string())
+
+        else:
+
+            with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+
+                server.starttls(context=context)
+
+                server.login(SMTP_USERNAME, SMTP_PASSWORD)
+
+                server.sendmail(EMAIL_FROM, [to_email], message.as_string())
 
         return True
 
@@ -421,31 +435,31 @@ def register():
 
         if len(username) < 3:
 
-            flash("Username must be at least 3 characters.")
+            flash("Username must be at least 3 characters.", "error")
 
             return redirect(url_for("register"))
 
         if is_reserved_username(username):
 
-            flash("That username is reserved. Please choose another one.")
+            flash("That username is reserved. Please choose another one.", "error")
 
             return redirect(url_for("register"))
 
         if "@" not in email or "." not in email.split("@")[-1]:
 
-            flash("Please enter a valid email address.")
+            flash("Please enter a valid email address.", "error")
 
             return redirect(url_for("register"))
 
         if len(password) < 4:
 
-            flash("Password must be at least 4 characters.")
+            flash("Password must be at least 4 characters.", "error")
 
             return redirect(url_for("register"))
 
         if password != confirm_password:
 
-            flash("Passwords do not match.")
+            flash("Passwords do not match.", "error")
 
             return redirect(url_for("register"))
 
@@ -457,7 +471,7 @@ def register():
 
         if existing_username:
 
-            flash("That username already exists.")
+            flash("That username already exists.", "error")
 
             return redirect(url_for("register"))
 
@@ -467,7 +481,7 @@ def register():
 
         if existing_email:
 
-            flash("An account with that email already exists.")
+            flash("An account with that email already exists.", "error")
 
             return redirect(url_for("register"))
 
@@ -478,12 +492,13 @@ def register():
             "email": email,
             "password": hashed_password,
             "points": 0,
+            "photo_url": None,
             "reset_token": None,
             "reset_token_expires": None,
             "created_at": firestore.SERVER_TIMESTAMP
         })
 
-        flash("Account created! Just hit login below.")
+        flash("Account created! Just hit login below.", "success")
 
         # Carry the just-entered credentials over to the login page so
         # the user only has to press "Login" — nothing to retype. This
@@ -530,9 +545,11 @@ def citizen_login():
 
             session["citizen_username"] = user_doc.to_dict()["username"]
 
+            session["citizen_photo_url"] = user_doc.to_dict().get("photo_url")
+
             return redirect(url_for("home"))
 
-        flash("Incorrect username or password.")
+        flash("Incorrect username or password.", "error")
 
     # Pop (not just read) any prefill values left by a fresh registration
     # so they're only ever used once, right after signing up.
@@ -557,6 +574,8 @@ def citizen_logout():
     session.pop("citizen_id", None)
 
     session.pop("citizen_username", None)
+
+    session.pop("citizen_photo_url", None)
 
     return redirect(url_for("citizen_login"))
 
@@ -618,7 +637,8 @@ def forgot_password():
         # reveal which emails have accounts registered.
         flash(
             "If that email is registered, we've sent a password reset "
-            "link. Check your inbox (and spam folder)."
+            "link. Check your inbox (and spam folder).",
+            "info"
         )
 
         return redirect(url_for("citizen_login"))
@@ -659,7 +679,8 @@ def reset_password(token):
 
         flash(
             "That reset link is invalid or has expired. Please request "
-            "a new one."
+            "a new one.",
+            "error"
         )
 
         return redirect(url_for("forgot_password"))
@@ -672,13 +693,13 @@ def reset_password(token):
 
         if len(password) < 4:
 
-            flash("Password must be at least 4 characters.")
+            flash("Password must be at least 4 characters.", "error")
 
             return redirect(url_for("reset_password", token=token))
 
         if password != confirm_password:
 
-            flash("Passwords do not match.")
+            flash("Passwords do not match.", "error")
 
             return redirect(url_for("reset_password", token=token))
 
@@ -688,7 +709,7 @@ def reset_password(token):
             "reset_token_expires": None
         })
 
-        flash("Your password has been reset. You can log in now.")
+        flash("Your password has been reset. You can log in now.", "success")
 
         return redirect(url_for("citizen_login"))
 
@@ -757,6 +778,55 @@ def profile():
 
 
 # =========================================================
+# UPDATE PROFILE PICTURE (citizen)
+# =========================================================
+
+@app.route("/update-pfp", methods=["POST"])
+def update_pfp():
+
+    if not session.get("citizen_id"):
+
+        return redirect(url_for("citizen_login"))
+
+    citizen_id = session["citizen_id"]
+
+    image = request.files.get("pfp")
+
+    if not image or not image.filename:
+
+        flash("Please choose a photo to upload.", "error")
+
+        return redirect(url_for("profile"))
+
+    if not allowed_image(image.filename):
+
+        flash(
+            "Please upload an image file (png, jpg, jpeg, gif, or webp).",
+            "error"
+        )
+
+        return redirect(url_for("profile"))
+
+    original_name = secure_filename(image.filename)
+
+    extension = original_name.rsplit(".", 1)[1].lower()
+
+    # Profile pictures don't go through the garbage-detection check —
+    # that's only for complaint photos.
+    photo_url = upload_image_to_storage(image, extension)
+
+    db.collection("users").document(citizen_id).update({
+        "photo_url": photo_url
+    })
+
+    session["citizen_photo_url"] = photo_url
+
+    flash("Profile picture updated! 🌱", "success")
+
+    return redirect(url_for("profile"))
+
+
+# =========================================================
 # DELETE MY ACCOUNT (citizen)
 # =========================================================
 
@@ -788,7 +858,7 @@ def delete_account():
     # through by accident.
     if not check_password_hash(user.get("password", ""), password):
 
-        flash("Incorrect password. Your account was NOT deleted.")
+        flash("Incorrect password. Your account was NOT deleted.", "error")
 
         return redirect(url_for("profile"))
 
@@ -798,7 +868,7 @@ def delete_account():
 
     session.pop("citizen_username", None)
 
-    flash("Your account has been deleted. We're sad to see you go! 🌱")
+    flash("Your account has been deleted. We're sad to see you go! 🌱", "success")
 
     return redirect(url_for("citizen_login"))
 
@@ -872,7 +942,7 @@ def submit():
 
     if len(description) > 1000:
 
-        flash("Description is too long (max 1000 characters).")
+        flash("Description is too long (max 1000 characters).", "error")
 
         return redirect(url_for("home"))
 
@@ -880,13 +950,13 @@ def submit():
 
     if not image or not image.filename:
 
-        flash("Please upload a garbage photo.")
+        flash("Please upload a garbage photo.", "error")
 
         return redirect(url_for("home"))
 
     if not allowed_image(image.filename):
 
-        flash("Please upload an image file (png, jpg, jpeg, gif, or webp).")
+        flash("Please upload an image file (png, jpg, jpeg, gif, or webp).", "error")
 
         return redirect(url_for("home"))
 
@@ -900,7 +970,8 @@ def submit():
 
         flash(
             "We couldn't spot any garbage/litter in that photo. "
-            "Please upload a clear photo of the actual garbage."
+            "Please upload a clear photo of the actual garbage.",
+            "error"
         )
 
         return redirect(url_for("home"))
@@ -929,7 +1000,8 @@ def submit():
     })
 
     flash(
-        "🎉 Report received! Thank you for helping keep the city clean."
+        "🎉 Report received! Thank you for helping keep the city clean.",
+        "success"
     )
 
     return redirect(url_for("profile"))
@@ -959,7 +1031,7 @@ def login():
 
             return redirect(url_for("admin"))
 
-        flash("Wrong municipality username or password.")
+        flash("Wrong municipality username or password.", "error")
 
     return render_template("login.html")
 
@@ -1076,13 +1148,13 @@ def admin_delete_user(user_id):
 
     if not user_ref.get().exists:
 
-        flash("That account no longer exists.")
+        flash("That account no longer exists.", "error")
 
         return redirect(url_for("admin_users"))
 
     user_ref.delete()
 
-    flash("🗑️ Citizen account deleted.")
+    flash("🗑️ Citizen account deleted.", "success")
 
     return redirect(url_for("admin_users"))
 
@@ -1104,7 +1176,7 @@ def update_status(complaint_id):
 
     if new_status == "Denied" and len(denial_reason) < 3:
 
-        flash("Please give a reason (at least 3 characters) when denying a complaint.")
+        flash("Please give a reason (at least 3 characters) when denying a complaint.", "error")
 
         return redirect(url_for("admin"))
 
@@ -1173,13 +1245,13 @@ def delete_complaint(complaint_id):
 
     if not complaint_ref.get().exists:
 
-        flash("That report no longer exists.")
+        flash("That report no longer exists.", "error")
 
         return redirect(url_for("admin"))
 
     complaint_ref.delete()
 
-    flash("🗑️ Report deleted.")
+    flash("🗑️ Report deleted.", "success")
 
     return redirect(url_for("admin"))
 
