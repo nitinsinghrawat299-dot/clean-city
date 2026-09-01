@@ -27,7 +27,6 @@
     <thead>
       <tr>
         <th>#</th>
-        <th>Photo</th>
         <th>Citizen</th>
         <th>Issue</th>
         <th>Location</th>
@@ -41,15 +40,15 @@
         <tr>
           <td>#{{ '%03d' % c.report_number if c.report_number else c.id[:6] }}</td>
           <td>
-            {% if c.image %}
-              <button type="button" class="report-thumb-btn" onclick="openReportPhoto('{{ c.image }}', '{{ c.location | e }}')" title="Click to view full photo">
-                <img src="{{ c.image }}" alt="Report photo" class="report-thumb" loading="lazy">
-              </button>
-            {% else %}
-              <div class="report-thumb report-thumb-empty">—</div>
-            {% endif %}
+            <a href="{{ url_for('admin_report_detail', complaint_id=c.id) }}" class="citizen-cell" title="Click to review this report">
+              {% if c.image %}
+                <img src="{{ c.image }}" alt="Report photo" class="report-thumb-lg" loading="lazy">
+              {% else %}
+                <div class="report-thumb-lg report-thumb-empty">—</div>
+              {% endif %}
+              <span class="citizen-name">{{ c.citizen_username or c.name or '—' }}</span>
+            </a>
           </td>
-          <td>{{ c.citizen_username or c.name or '—' }}</td>
           <td style="max-width:220px;">
             {{ c.description[:60] if c.description else '(no description given)' }}{{ '…' if c.description and c.description|length > 60 }}
           </td>
@@ -58,8 +57,11 @@
           <td>{{ c.created_at.strftime('%d %b %Y') if c.created_at else '—' }}</td>
           <td>
             <div class="row-actions">
+              <a href="{{ url_for('admin_report_detail', complaint_id=c.id) }}" class="icon-btn" title="Open &amp; review this report">👁️</a>
               {% if c.coordinates %}
-                <a href="https://www.google.com/maps?q={{ c.coordinates }}" target="_blank" rel="noopener" class="icon-btn" title="Open location in Google Maps">🗺️</a>
+                <a href="https://www.google.com/maps?q={{ c.coordinates | urlencode }}" target="_blank" rel="noopener" class="icon-btn" title="Open location in Google Maps">🗺️</a>
+              {% elif c.address or c.location %}
+                <a href="https://www.google.com/maps?q={{ (c.address or c.location) | urlencode }}" target="_blank" rel="noopener" class="icon-btn" title="Open location in Google Maps">🗺️</a>
               {% endif %}
               <form method="POST" action="{{ url_for('update_status', complaint_id=c.id) }}" class="status-form" style="display:flex; gap:6px; align-items:center;">
                 <select name="status" class="search-input" style="min-width:120px; padding:6px 10px;" onchange="toggleReason(this)">

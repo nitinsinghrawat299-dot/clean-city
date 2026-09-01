@@ -15,6 +15,7 @@ import datetime
 import secrets
 import smtplib
 import ssl
+import threading
 from email.mime.text import MIMEText
 
 from dotenv import load_dotenv
@@ -205,7 +206,7 @@ def send_email(to_email, subject, body_text):
         # provider's port is a common reason emails silently fail.
         if SMTP_PORT == 465:
 
-            with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, context=context) as server:
+            with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, context=context, timeout=10) as server:
 
                 server.login(SMTP_USERNAME, SMTP_PASSWORD)
 
@@ -213,7 +214,7 @@ def send_email(to_email, subject, body_text):
 
         else:
 
-            with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            with smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=10) as server:
 
                 server.starttls(context=context)
 
@@ -619,19 +620,31 @@ def forgot_password():
                 _external=True
             )
 
-            send_email(
-                to_email=email,
-                subject="Reset your CleanCity password",
-                body_text=(
-                    "We received a request to reset your CleanCity "
-                    "password.\n\n"
-                    f"Click this link to choose a new password:\n{reset_link}\n\n"
-                    f"This link expires in {RESET_TOKEN_LIFETIME_MINUTES} "
-                    "minutes.\n\n"
-                    "If you didn't request this, you can safely ignore "
-                    "this email — your password will stay the same."
-                )
+            # Sending the email happens in a background thread so this
+            # request returns immediately. Without this, a slow or
+            # unreachable SMTP server (very common on free hosting,
+            # which often blocks outbound SMTP ports) makes the whole
+            # request hang, which is what caused the "reloading and
+            # reloading" behaviour on Forgot Password.
+            email_thread = threading.Thread(
+                target=send_email,
+                kwargs=dict(
+                    to_email=email,
+                    subject="Reset your CleanCity password",
+                    body_text=(
+                        "We received a request to reset your CleanCity "
+                        "password.\n\n"
+                        f"Click this link to choose a new password:\n{reset_link}\n\n"
+                        f"This link expires in {RESET_TOKEN_LIFETIME_MINUTES} "
+                        "minutes.\n\n"
+                        "If you didn't request this, you can safely ignore "
+                        "this email — your password will stay the same."
+                    )
+                ),
+                daemon=True
             )
+
+            email_thread.start()
 
         # Same message whether or not the email was found, so we don't
         # reveal which emails have accounts registered.
@@ -1098,6 +1111,53 @@ def admin():
     return render_template(
         "admin.html",
         complaints=complaints
+    )
+
+
+# =========================================================
+# REVIEW A SINGLE REPORT (admin) — open a report to review it
+# in full: large photo, description, and a map of the pin.
+# =========================================================
+
+@app.route("/admin/report/<complaint_id>")
+def admin_report_detail(complaint_id):
+
+    if not session.get("admin_logged_in"):
+
+        return redirect(url_for("login"))
+
+    complaint_doc = db.collection("complaints").document(complaint_id).get()
+
+    if not complaint_doc.exists:
+
+        flash("That report no longer exists.", "error")
+
+        return redirect(url_for("admin"))
+
+    complaint = complaint_doc.to_dict()
+
+    complaint["id"] = complaint_doc.id
+
+    citizen_username = None
+
+    citizen = None
+
+    if complaint.get("citizen_id"):
+
+        user_doc = db.collection("users").document(complaint["citizen_id"]).get()
+
+        if user_doc.exists:
+
+            citizen = user_doc.to_dict()
+
+            citizen_username = citizen.get("username")
+
+    complaint["citizen_username"] = complaint.get("name") or citizen_username
+
+    return render_template(
+        "admin_report_detail.html",
+        c=complaint,
+        citizen=citizen
     )
 
 
