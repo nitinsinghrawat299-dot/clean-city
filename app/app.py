@@ -271,7 +271,8 @@ ROBOFLOW_MODEL_ID = os.environ.get(
     "garbage_detection-wvzwv/9"
 )
 
-GARBAGE_CONFIDENCE_THRESHOLD = 0.90
+GARBAGE_CONFIDENCE_THRESHOLD = 0.50
+
 
 
 def contains_garbage(image_bytes):
