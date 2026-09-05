@@ -31,8 +31,8 @@
             </div>
             <div class="field" style="margin-bottom:0;">
               <label class="upload-drop" id="dropLabel">
-                <input type="file" name="image" id="imageInput" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp" required>
-                <div id="dropText">☁️ Click to upload or drag and drop<br><span style="font-size:.78rem;">PNG, JPG up to 8MB — must clearly show the garbage/litter</span></div>
+                <input type="file" name="image" id="imageInput" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp" capture="environment" required>
+                <div id="dropText">📷 Tap to take a live photo<br><span style="font-size:.78rem;">Must be taken now with your camera — old photos from your gallery won't be accepted</span></div>
               </label>
               <div class="upload-preview" id="previewWrap">
                 <img id="previewImg" src="" alt="Preview">
@@ -65,6 +65,40 @@
           <div class="spr-step">
             <div class="spr-step-head">
               <span class="spr-step-num">3</span>
+              <div>
+                <h3>Classify</h3>
+                <p>What kind of issue is this, and which ward?</p>
+              </div>
+            </div>
+            <div class="field">
+              <label for="department">Department</label>
+              <select id="department" name="department" required>
+                <option value="" disabled selected>Select a department</option>
+                {% for dept in department_categories %}
+                  <option value="{{ dept }}">{{ dept }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="field">
+              <label for="subcategory">Issue type</label>
+              <select id="subcategory" name="subcategory" required disabled>
+                <option value="" disabled selected>Select a department first</option>
+              </select>
+            </div>
+            <div class="field" style="margin-bottom:0;">
+              <label for="ward_number">Ward number</label>
+              <select id="ward_number" name="ward_number" required>
+                <option value="" disabled selected>Select your ward</option>
+                {% for w in ward_numbers %}
+                  <option value="{{ w }}">Ward {{ w }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+          <div class="spr-step">
+            <div class="spr-step-head">
+              <span class="spr-step-num">4</span>
               <div>
                 <h3>Report</h3>
                 <p>Add any extra detail, then send it in.</p>
@@ -108,6 +142,23 @@
 {% block extra_scripts %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
+  // ---- Department -> subcategory dropdown ----
+  const DEPARTMENT_CATEGORIES = {{ department_categories | tojson }};
+  const departmentSelect = document.getElementById('department');
+  const subcategorySelect = document.getElementById('subcategory');
+
+  departmentSelect.addEventListener('change', () => {
+    const subcats = DEPARTMENT_CATEGORIES[departmentSelect.value] || [];
+    subcategorySelect.innerHTML = '<option value="" disabled selected>Select an issue type</option>';
+    subcats.forEach(sub => {
+      const opt = document.createElement('option');
+      opt.value = sub;
+      opt.textContent = sub;
+      subcategorySelect.appendChild(opt);
+    });
+    subcategorySelect.disabled = subcats.length === 0;
+  });
+
   // ---- Pin map: lets the citizen see & fine-tune the exact spot ----
   const DEFAULT_CENTER = [30.1500, 78.7800]; // Pauri Garhwal, as a sensible default
   const coordsField = document.getElementById('coordinates');
