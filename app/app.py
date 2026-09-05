@@ -271,8 +271,53 @@ ROBOFLOW_MODEL_ID = os.environ.get(
     "garbage_detection-wvzwv/9"
 )
 
-GARBAGE_CONFIDENCE_THRESHOLD = 0.30
+GARBAGE_CONFIDENCE_THRESHOLD = 0.50
 
+
+# -----------------------------------------------------------
+# COMPLIANCE CATEGORY MAP — the 16 national Swachhata-MoHUA
+# sub-categories grouped into 4 operational departments.
+# Server-side whitelist: never trust department/subcategory
+# values from the client without checking them against this.
+# -----------------------------------------------------------
+
+DEPARTMENT_CATEGORIES = {
+    "Solid Waste & Street Cleaning": [
+        "Garbage Dump",
+        "Dustbins Not Cleaned",
+        "Sweeping Not Done",
+        "Garbage Vehicle Not Arrived",
+        "Burning of Garbage",
+        "Dirty Spot",
+    ],
+    "Public Health & Toilet Maintenance": [
+        "Uncleaning Public Toilet",
+        "Blockage",
+        "No Water Supply",
+        "No Electricity",
+    ],
+    "Civil Works & Drainage": [
+        "Open Manholes/Drains",
+        "Sewerage Overflow",
+        "Septic Tank Overflow",
+        "Stagnant Water",
+    ],
+    "Emergency & Special Operations": [
+        "Debris Removal",
+        "Dead Animal Removal",
+        "Yellow Spot",
+        "Open Defecation",
+        "Unsafe Manhole Entry",
+    ],
+}
+
+# Departments whose photos are checked by the Roboflow garbage-detection
+# model. Other departments skip this check since there's no matching
+# vision model for them yet (e.g. manholes, dead animals, toilets).
+AI_CHECKED_DEPARTMENTS = {"Solid Waste & Street Cleaning"}
+
+# Pauri Nagar Palika has 11 wards.
+WARD_NUMBERS = list(range(1, 12))
 
 
 def contains_garbage(image_bytes):
@@ -384,7 +429,11 @@ def home():
 
     if session.get("citizen_id"):
 
-        return render_template("index.html")
+        return render_template(
+            "index.html",
+            department_categories=DEPARTMENT_CATEGORIES,
+            ward_numbers=WARD_NUMBERS
+        )
 
     # Not logged in -> public landing page (visitors haven't signed up
     # yet), instead of bouncing them straight to the login form.
@@ -644,9 +693,7 @@ def forgot_password():
                 ),
                 daemon=True
             )
-
             email_thread.start()
-
         # Same message whether or not the email was found, so we don't
         # reveal which emails have accounts registered.
         flash(
@@ -654,132 +701,78 @@ def forgot_password():
             "link. Check your inbox (and spam folder).",
             "info"
         )
-
         return redirect(url_for("citizen_login"))
-
     return render_template("forgot_password.html")
-
-
 # =========================================================
 # RESET PASSWORD — via the emailed token link
 # =========================================================
-
 @app.route("/reset-password/<token>", methods=["GET", "POST"])
 def reset_password(token):
-
     users_ref = db.collection("users")
-
     matches = list(
         users_ref.where("reset_token", "==", token).limit(1).stream()
     )
-
     user_doc = matches[0] if matches else None
-
     token_valid = False
-
     if user_doc:
-
         expires_raw = user_doc.to_dict().get("reset_token_expires")
-
         if expires_raw:
-
             expires_at = datetime.datetime.fromisoformat(expires_raw)
-
             if datetime.datetime.utcnow() <= expires_at:
-
                 token_valid = True
-
     if not token_valid:
-
         flash(
             "That reset link is invalid or has expired. Please request "
             "a new one.",
             "error"
         )
-
         return redirect(url_for("forgot_password"))
-
     if request.method == "POST":
-
         password = request.form.get("password", "")
-
         confirm_password = request.form.get("confirm_password", "")
-
         if len(password) < 4:
-
             flash("Password must be at least 4 characters.", "error")
-
             return redirect(url_for("reset_password", token=token))
-
         if password != confirm_password:
-
             flash("Passwords do not match.", "error")
-
             return redirect(url_for("reset_password", token=token))
-
         user_doc.reference.update({
             "password": generate_password_hash(password),
             "reset_token": None,
             "reset_token_expires": None
         })
-
         flash("Your password has been reset. You can log in now.", "success")
-
         return redirect(url_for("citizen_login"))
-
     return render_template("reset_password.html", token=token)
-
-
 # =========================================================
 # CITIZEN PROFILE
 # =========================================================
-
 @app.route("/profile")
 def profile():
-
     if not session.get("citizen_id"):
-
         return redirect(url_for("citizen_login"))
-
     citizen_id = session["citizen_id"]
-
     user_doc = db.collection("users").document(citizen_id).get()
-
     if not user_doc.exists:
-
         session.pop("citizen_id", None)
-
         return redirect(url_for("citizen_login"))
-
     user = user_doc.to_dict()
-
     complaint_docs = list(
         db.collection("complaints")
         .where("citizen_id", "==", citizen_id)
         .order_by("created_at", direction=firestore.Query.DESCENDING)
         .stream()
     )
-
     complaints = []
-
     resolved = 0
-
     for doc in complaint_docs:
-
         data = doc.to_dict()
-
         data["id"] = doc.id
-
         complaints.append(data)
-
         if data.get("status") == "Resolved":
-
             resolved += 1
-
     total = len(complaints)
-
     badge_icon, badge_name = get_badge(user.get("points", 0))
-
     return render_template(
         "profile.html",
         user=user,
@@ -789,8 +782,6 @@ def profile():
         badge_icon=badge_icon,
         badge_name=badge_name
     )
-
-
 # =========================================================
 # UPDATE PROFILE PICTURE (citizen)
 # =========================================================
@@ -811,104 +802,64 @@ def update_pfp():
         flash("Please choose a photo to upload.", "error")
 
         return redirect(url_for("profile"))
-
     if not allowed_image(image.filename):
-
         flash(
             "Please upload an image file (png, jpg, jpeg, gif, or webp).",
             "error"
         )
-
         return redirect(url_for("profile"))
-
     original_name = secure_filename(image.filename)
-
     extension = original_name.rsplit(".", 1)[1].lower()
-
     # Profile pictures don't go through the garbage-detection check —
     # that's only for complaint photos.
     photo_url = upload_image_to_storage(image, extension)
-
     db.collection("users").document(citizen_id).update({
         "photo_url": photo_url
     })
-
     session["citizen_photo_url"] = photo_url
-
     flash("Profile picture updated! 🌱", "success")
-
     return redirect(url_for("profile"))
-
-
-# =========================================================
+    # =========================================================
 # DELETE MY ACCOUNT (citizen)
 # =========================================================
-
 @app.route("/delete-account", methods=["POST"])
 def delete_account():
-
     if not session.get("citizen_id"):
-
         return redirect(url_for("citizen_login"))
-
     citizen_id = session["citizen_id"]
-
     password = request.form.get("password", "")
-
     user_doc = db.collection("users").document(citizen_id).get()
-
     if not user_doc.exists:
-
         session.pop("citizen_id", None)
-
         session.pop("citizen_username", None)
-
         return redirect(url_for("citizen_login"))
-
     user = user_doc.to_dict()
-
     # Require the password again as a safety check before permanently
     # deleting the account — a confirm dialog alone is easy to click
     # through by accident.
     if not check_password_hash(user.get("password", ""), password):
-
         flash("Incorrect password. Your account was NOT deleted.", "error")
-
         return redirect(url_for("profile"))
-
     db.collection("users").document(citizen_id).delete()
-
     session.pop("citizen_id", None)
-
     session.pop("citizen_username", None)
-
     flash("Your account has been deleted. We're sad to see you go! 🌱", "success")
-
     return redirect(url_for("citizen_login"))
-
-
 # =========================================================
 # LEADERBOARD
 # =========================================================
-
 @app.route("/leaderboard")
 def leaderboard():
-
     users_docs = (
         db.collection("users")
         .order_by("points", direction=firestore.Query.DESCENDING)
         .limit(20)
         .stream()
     )
-
     leaderboard_data = []
-
     for index, doc in enumerate(users_docs, start=1):
-
         user = doc.to_dict()
-
         icon, badge = get_badge(user.get("points", 0))
-
         leaderboard_data.append({
             "rank": index,
             "username": user.get("username"),
@@ -916,54 +867,53 @@ def leaderboard():
             "icon": icon,
             "badge": badge
         })
-
     return render_template(
         "leaderboard.html",
         users=leaderboard_data
     )
-
 # =========================================================
 # ABOUT PAURI GARHWAL — informational page
 # =========================================================
-
 @app.route("/pauri-garhwal")
 def pauri_garhwal():
-
     return render_template("paurigarhwal.html")
-
 # =========================================================
 # SUBMIT COMPLAINT
 # =========================================================
-
 @app.route("/submit", methods=["POST"])
 def submit():
-
     if not session.get("citizen_id"):
-
         return redirect(url_for("citizen_login"))
-
     citizen_id = session["citizen_id"]
-
     username = session.get("citizen_username", "Citizen")
-
     description = request.form.get("description", "").strip()
-
     location = request.form.get("location", "").strip()
-
     coordinates = request.form.get("coordinates", "").strip()
-
     address = request.form.get("address", "").strip()
-
+    department = request.form.get("department", "").strip()
+    subcategory = request.form.get("subcategory", "").strip()
+    ward_number_raw = request.form.get("ward_number", "").strip()
     if len(description) > 1000:
-
         flash("Description is too long (max 1000 characters).", "error")
-
         return redirect(url_for("home"))
-
+    # Validate department/subcategory against the server-side whitelist —
+    # never trust these values as sent, since the client could tamper
+    # with the <select> options.
+    if department not in DEPARTMENT_CATEGORIES:
+        flash("Please choose a valid issue department.", "error")
+        return redirect(url_for("home"))
+    if subcategory not in DEPARTMENT_CATEGORIES[department]:
+        flash("Please choose a valid issue type for that department.", "error")
+        return redirect(url_for("home"))
+    try:
+        ward_number = int(ward_number_raw)
+        if ward_number not in WARD_NUMBERS:
+            raise ValueError
+    except ValueError:
+        flash("Please choose a valid ward number.", "error")
+        return redirect(url_for("home"))
     image = request.files.get("image")
-
     if not image or not image.filename:
-
         flash("Please upload a garbage photo.", "error")
 
         return redirect(url_for("home"))
@@ -980,7 +930,11 @@ def submit():
 
     image_bytes = image.read()
 
-    if not contains_garbage(image_bytes):
+    # Only run the AI garbage-detection check for the department it was
+    # actually trained for. Other departments (manholes, toilets, dead
+    # animals, etc.) don't have a matching vision model yet, so their
+    # photos pass through on the citizen's word for now.
+    if department in AI_CHECKED_DEPARTMENTS and not contains_garbage(image_bytes):
 
         flash(
             "We couldn't spot any garbage/litter in that photo. "
@@ -1010,75 +964,52 @@ def submit():
         "citizen_id": citizen_id,
         "points_awarded": 0,
         "denial_reason": "",
+        "department": department,
+        "subcategory": subcategory,
+        "ward_number": ward_number,
         "created_at": firestore.SERVER_TIMESTAMP
     })
-
     flash(
         "🎉 Report received! Thank you for helping keep the city clean.",
         "success"
     )
-
     return redirect(url_for("profile"))
-
-
-# =========================================================
+    # =========================================================
 # MUNICIPALITY LOGIN
 # =========================================================
-
 @app.route("/login", methods=["GET", "POST"])
 def login():
-
     if request.method == "POST":
-
         username = request.form.get("username")
-
         password = request.form.get("password")
-
         if (
             username == ADMIN_USERNAME
             and check_password_hash(ADMIN_PASSWORD_HASH, password or "")
         ):
-
             session.permanent = True
-
             session["admin_logged_in"] = True
-
             return redirect(url_for("admin"))
-
         flash("Wrong municipality username or password.", "error")
-
     return render_template("login.html")
-
-
 # =========================================================
 # MUNICIPALITY LOGOUT
 # =========================================================
-
 @app.route("/logout")
 def logout():
-
     session.pop("admin_logged_in", None)
-
     return redirect(url_for("login"))
-
-
 # =========================================================
 # MUNICIPALITY DASHBOARD
 # =========================================================
-
 @app.route("/admin")
 def admin():
-
     if not session.get("admin_logged_in"):
-
         return redirect(url_for("login"))
-
     complaint_docs = list(
         db.collection("complaints")
         .order_by("created_at", direction=firestore.Query.DESCENDING)
         .stream()
     )
-
     # Batch-fetch usernames for all citizen_ids referenced, instead of
     # one query per complaint (mirrors the old SQL LEFT JOIN).
     citizen_ids = {
@@ -1086,186 +1017,108 @@ def admin():
         for doc in complaint_docs
         if doc.to_dict().get("citizen_id")
     }
-
     usernames_by_id = {}
-
     for cid in citizen_ids:
-
         user_doc = db.collection("users").document(cid).get()
-
         if user_doc.exists:
-
             usernames_by_id[cid] = user_doc.to_dict().get("username")
-
     complaints = []
-
     for doc in complaint_docs:
-
         data = doc.to_dict()
-
         data["id"] = doc.id
-
         data["citizen_username"] = usernames_by_id.get(data.get("citizen_id"))
-
         complaints.append(data)
-
     return render_template(
         "admin.html",
         complaints=complaints
     )
-
-
 # =========================================================
 # REVIEW A SINGLE REPORT (admin) — open a report to review it
 # in full: large photo, description, and a map of the pin.
 # =========================================================
-
 @app.route("/admin/report/<complaint_id>")
 def admin_report_detail(complaint_id):
-
     if not session.get("admin_logged_in"):
-
         return redirect(url_for("login"))
-
     complaint_doc = db.collection("complaints").document(complaint_id).get()
-
     if not complaint_doc.exists:
-
         flash("That report no longer exists.", "error")
-
         return redirect(url_for("admin"))
-
     complaint = complaint_doc.to_dict()
-
     complaint["id"] = complaint_doc.id
-
     citizen_username = None
-
     citizen = None
-
     if complaint.get("citizen_id"):
-
         user_doc = db.collection("users").document(complaint["citizen_id"]).get()
-
         if user_doc.exists:
-
             citizen = user_doc.to_dict()
-
             citizen_username = citizen.get("username")
-
     complaint["citizen_username"] = complaint.get("name") or citizen_username
-
     return render_template(
         "admin_report_detail.html",
         c=complaint,
         citizen=citizen
     )
-
-
 # =========================================================
 # MANAGE CITIZENS (admin) — view + delete citizen accounts
 # =========================================================
-
 @app.route("/admin/users")
 def admin_users():
-
     if not session.get("admin_logged_in"):
-
         return redirect(url_for("login"))
-
     user_docs = (
         db.collection("users")
         .order_by("username")
         .stream()
     )
-
     users = []
-
     for doc in user_docs:
-
         data = doc.to_dict()
-
         data["id"] = doc.id
-
         badge_icon, badge_name = get_badge(data.get("points", 0))
-
         data["badge_icon"] = badge_icon
-
         data["badge_name"] = badge_name
-
         users.append(data)
-
     return render_template("admin_users.html", users=users)
-
-
 @app.route("/admin/delete-user/<user_id>", methods=["POST"])
 def admin_delete_user(user_id):
-
     if not session.get("admin_logged_in"):
-
         return redirect(url_for("login"))
-
     user_ref = db.collection("users").document(user_id)
-
     if not user_ref.get().exists:
-
         flash("That account no longer exists.", "error")
-
         return redirect(url_for("admin_users"))
-
     user_ref.delete()
-
     flash("🗑️ Citizen account deleted.", "success")
-
     return redirect(url_for("admin_users"))
-
-
 # =========================================================
 # UPDATE COMPLAINT STATUS
 # =========================================================
-
 @app.route("/update/<complaint_id>", methods=["POST"])
 def update_status(complaint_id):
-
     if not session.get("admin_logged_in"):
-
         return redirect(url_for("login"))
-
     new_status = request.form.get("status")
-
     denial_reason = request.form.get("reason", "").strip()
-
     if new_status == "Denied" and len(denial_reason) < 3:
-
         flash("Please give a reason (at least 3 characters) when denying a complaint.", "error")
-
         return redirect(url_for("admin"))
-
     complaint_ref = db.collection("complaints").document(complaint_id)
-
     complaint_doc = complaint_ref.get()
-
     if not complaint_doc.exists:
-
         return "Complaint not found"
-
     complaint = complaint_doc.to_dict()
-
     old_status = complaint.get("status")
-
     # -----------------------------------------------------
     # RESOLVED = GIVE POINTS
     # -----------------------------------------------------
-
     if (
         new_status == "Resolved"
         and old_status != "Resolved"
         and complaint.get("points_awarded", 0) == 0
         and complaint.get("citizen_id")
     ):
-
         points = 10
-
         db.collection("users").document(complaint["citizen_id"]).update({
             "points": Increment(points)
         })
