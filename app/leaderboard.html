@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Leaderboard — SPR{% endblock %}
+
+{% block content %}
+<section style="padding:44px 0;">
+  <div class="wrap">
+    <div class="dash-header">
+      <h1>🏆 Leaderboard</h1>
+      <p>Top contributors making {{ "our" }} city cleaner.</p>
+    </div>
+
+    <div class="card" style="padding:8px 8px 20px;">
+      <div style="overflow-x:auto;">
+        <table class="lb-table">
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>User</th>
+              <th>Badge</th>
+              <th>Points</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for u in users %}
+              <tr class="{{ 'me' if session.get('citizen_username') == u.username }}">
+                <td class="lb-rank {{ 'top' if u.rank <= 3 }}">#{{ u.rank }}</td>
+                <td>
+                  <div class="lb-user">
+                    <span class="lb-avatar">{{ u.username[:1] | upper }}</span>
+                    <span>{{ u.username }}{% if session.get('citizen_username') == u.username %} (you){% endif %}</span>
+                  </div>
+                </td>
+                <td>{{ u.icon }} {{ u.badge }}</td>
+                <td><strong>{{ u.points }}</strong> pts</td>
+              </tr>
+            {% else %}
+              <tr><td colspan="4" class="empty-state">No citizens on the leaderboard yet — be the first to report an issue!</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

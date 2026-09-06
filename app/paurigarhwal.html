@@ -1,0 +1,2270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pauri Garhwal | District Information Portal</title>
+
+  <style>
+    /* =====================================
+       PAURI GARHWAL - COMPLETE MODERN DESIGN
+       ===================================== */
+
+    :root {
+      --navy: #06213b;
+      --navy-2: #0b365c;
+      --blue: #1469a7;
+      --green: #0b5d44;
+      --green-2: #0f7a58;
+      --gold: #e5ad42;
+      --gold-light: #f9d78a;
+      --cream: #f7f4ed;
+      --white: #ffffff;
+      --paper: #f4f7f8;
+      --ink: #16222c;
+      --muted: #66737d;
+      --line: #d9e2e5;
+      --shadow: 0 18px 50px rgba(7, 29, 44, 0.13);
+      --shadow-soft: 0 8px 22px rgba(7, 29, 44, 0.08);
+      --radius-lg: 24px;
+      --radius-md: 16px;
+      --radius-sm: 11px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: "Segoe UI", Arial, Helvetica, sans-serif;
+      background:
+        radial-gradient(circle at top right, rgba(229, 173, 66, 0.10), transparent 24%),
+        linear-gradient(180deg, #edf3f4 0, #f7f8f6 560px, #f5f6f5 100%);
+      color: var(--ink);
+      line-height: 1.65;
+      overflow-x: hidden;
+    }
+
+    body.large-text {
+      font-size: 112%;
+    }
+
+    a {
+      text-decoration: none;
+    }
+
+    img {
+      max-width: 100%;
+    }
+
+    /* =====================================
+       OFFICIAL HEADER
+       ===================================== */
+
+    .top-strip {
+      background: var(--navy);
+      color: rgba(255, 255, 255, 0.82);
+      font-size: 12px;
+    }
+
+    .top-strip-inner {
+      width: min(1240px, calc(100% - 40px));
+      min-height: 34px;
+      margin: auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 15px;
+    }
+
+    .top-strip-left,
+    .top-strip-right {
+      display: flex;
+      gap: 15px;
+      align-items: center;
+    }
+
+    .top-strip strong {
+      color: var(--gold-light);
+      font-weight: 700;
+    }
+
+    .site-header {
+      background: rgba(255, 255, 255, 0.96);
+      border-bottom: 1px solid #dfe7ea;
+      position: relative;
+      z-index: 50;
+    }
+
+    .header-inner {
+      width: min(1240px, calc(100% - 40px));
+      min-height: 82px;
+      margin: auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .brand {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+    }
+
+    .emblem {
+      width: 53px;
+      height: 53px;
+      border-radius: 15px;
+      display: grid;
+      place-items: center;
+      font-size: 28px;
+      background: linear-gradient(145deg, #fbf5e6, #f5dd9b);
+      box-shadow: inset 0 0 0 1px rgba(189, 132, 21, 0.30);
+    }
+
+    .brand-kicker {
+      color: var(--green);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      font-size: 10px;
+      font-weight: 900;
+    }
+
+    .brand-title {
+      color: var(--navy);
+      font-size: clamp(17px, 2vw, 23px);
+      line-height: 1.15;
+      font-weight: 900;
+      margin-top: 2px;
+    }
+
+    .brand-subtitle {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .header-btn {
+      border: 1px solid #cbd8df;
+      background: #ffffff;
+      color: var(--navy-2);
+      border-radius: 9px;
+      padding: 8px 11px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 800;
+      transition: all 0.2s ease;
+    }
+
+    .header-btn:hover {
+      background: #eff6f9;
+      border-color: var(--blue);
+      transform: translateY(-1px);
+    }
+
+    /* =====================================
+       NAVIGATION
+       ===================================== */
+
+    .main-nav {
+      position: sticky;
+      top: 0;
+      z-index: 45;
+      background: rgba(6, 33, 59, 0.96);
+      backdrop-filter: blur(14px);
+      box-shadow: 0 7px 20px rgba(2, 15, 28, 0.20);
+    }
+
+    .nav-inner {
+      width: min(1240px, calc(100% - 40px));
+      min-height: 52px;
+      margin: auto;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .nav-inner::-webkit-scrollbar {
+      display: none;
+    }
+
+    .nav-inner a {
+      flex: 0 0 auto;
+      color: rgba(255, 255, 255, 0.82);
+      padding: 11px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.1px;
+      transition: 0.2s ease;
+    }
+
+    .nav-inner a:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: #ffffff;
+    }
+
+    /* =====================================
+       HERO
+       ===================================== */
+
+    .hero {
+      min-height: 740px;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      isolation: isolate;
+      background: #0b2335;
+    }
+
+    .hero-image {
+      position: absolute;
+      inset: 0;
+      z-index: -3;
+      background-image: url("/static/images/nature.jpg");
+      background-size: cover;
+      background-position: center center;
+      animation: slowZoom 20s ease-in-out infinite alternate;
+    }
+
+    .hero-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: -2;
+      background:
+        linear-gradient(90deg,
+          rgba(3, 19, 33, 0.95) 0%,
+          rgba(3, 19, 33, 0.78) 35%,
+          rgba(3, 19, 33, 0.34) 72%,
+          rgba(3, 19, 33, 0.52) 100%),
+        linear-gradient(0deg,
+          rgba(3, 19, 33, 0.72) 0%,
+          rgba(3, 19, 33, 0.04) 52%,
+          rgba(3, 19, 33, 0.36) 100%);
+    }
+
+    .hero-overlay::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 80% 23%, rgba(229, 173, 66, 0.30), transparent 22%),
+        radial-gradient(circle at 20% 80%, rgba(15, 122, 88, 0.36), transparent 32%);
+      opacity: 0.75;
+      mix-blend-mode: screen;
+    }
+
+    .hero-pattern {
+      position: absolute;
+      z-index: -1;
+      inset: 0;
+      opacity: 0.13;
+      background-image:
+        linear-gradient(30deg, rgba(255,255,255,.22) 12%, transparent 12.5%, transparent 87%, rgba(255,255,255,.22) 87.5%, rgba(255,255,255,.22)),
+        linear-gradient(150deg, rgba(255,255,255,.22) 12%, transparent 12.5%, transparent 87%, rgba(255,255,255,.22) 87.5%, rgba(255,255,255,.22));
+      background-size: 50px 86px;
+      mask-image: linear-gradient(to bottom, transparent, black 40%, transparent);
+    }
+
+    .hero-content {
+      width: min(1240px, calc(100% - 40px));
+      margin: auto;
+      color: #ffffff;
+      padding: 95px 0 115px;
+      animation: heroEntrance 0.9s ease both;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      padding: 9px 15px;
+      border: 1px solid rgba(255,255,255,0.34);
+      border-radius: 999px;
+      background: rgba(255,255,255,0.13);
+      backdrop-filter: blur(12px);
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.4px;
+      margin-bottom: 28px;
+    }
+
+    .hero-kicker {
+      font-size: 12px;
+      color: #f5cc74;
+      font-weight: 900;
+      letter-spacing: 3.2px;
+      margin-bottom: 14px;
+    }
+
+    .hero h1 {
+      font-size: clamp(4rem, 9vw, 8rem);
+      line-height: 0.88;
+      letter-spacing: -4px;
+      font-weight: 950;
+      max-width: 770px;
+      text-shadow: 0 7px 24px rgba(0,0,0,0.30);
+      margin-bottom: 25px;
+    }
+
+    .hero-description {
+      max-width: 690px;
+      font-size: clamp(1.05rem, 2.1vw, 1.40rem);
+      color: rgba(255,255,255,0.92);
+      line-height: 1.6;
+      margin-bottom: 31px;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 42px;
+    }
+
+    .hero-btn {
+      min-height: 50px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 21px;
+      border-radius: 11px;
+      font-size: 14px;
+      font-weight: 900;
+      transition: 0.2s ease;
+    }
+
+    .hero-btn-primary {
+      color: #1a250d;
+      background: #f5cd73;
+      box-shadow: 0 12px 22px rgba(0,0,0,0.23);
+    }
+
+    .hero-btn-primary:hover {
+      background: #ffdc91;
+      transform: translateY(-3px);
+    }
+
+    .hero-btn-secondary {
+      color: #ffffff;
+      border: 1px solid rgba(255,255,255,0.48);
+      background: rgba(255,255,255,0.11);
+      backdrop-filter: blur(10px);
+    }
+
+    .hero-btn-secondary:hover {
+      background: rgba(255,255,255,0.22);
+      transform: translateY(-3px);
+    }
+
+    .hero-stat-row {
+      display: flex;
+      flex-wrap: wrap;
+      width: fit-content;
+      max-width: 100%;
+      padding-top: 22px;
+      border-top: 1px solid rgba(255,255,255,0.32);
+    }
+
+    .hero-stat {
+      min-width: 155px;
+      padding: 0 24px;
+      border-right: 1px solid rgba(255,255,255,0.24);
+    }
+
+    .hero-stat:first-child {
+      padding-left: 0;
+    }
+
+    .hero-stat:last-child {
+      border-right: 0;
+    }
+
+    .hero-stat strong {
+      display: block;
+      font-size: 21px;
+      line-height: 1.1;
+      color: #ffffff;
+    }
+
+    .hero-stat span {
+      display: block;
+      margin-top: 4px;
+      font-size: 11px;
+      color: rgba(255,255,255,0.71);
+    }
+
+    .scroll-note {
+      position: absolute;
+      left: 50%;
+      bottom: 25px;
+      transform: translateX(-50%);
+      color: rgba(255,255,255,0.75);
+      text-transform: uppercase;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .scroll-circle {
+      width: 27px;
+      height: 27px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.48);
+      animation: bounceDown 1.6s infinite ease-in-out;
+      font-size: 16px;
+    }
+
+    /* =====================================
+       EXPLORE TOP CARDS
+       ===================================== */
+
+    .explore-wrap {
+      width: min(1240px, calc(100% - 40px));
+      margin: -78px auto 42px;
+      padding: 35px;
+      position: relative;
+      z-index: 10;
+      background: rgba(255,255,255,0.97);
+      border: 1px solid rgba(255,255,255,0.90);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow);
+    }
+
+    .explore-heading {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+
+    .section-kicker {
+      color: var(--green);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .explore-heading h2 {
+      color: var(--navy);
+      margin-top: 5px;
+      font-size: clamp(1.8rem, 3.2vw, 2.6rem);
+      line-height: 1.1;
+    }
+
+    .explore-heading p {
+      max-width: 410px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .explore-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 15px;
+    }
+
+    .explore-card {
+      min-height: 320px;
+      overflow: hidden;
+      position: relative;
+      border-radius: 18px;
+      color: #ffffff;
+      background-position: center;
+      background-size: cover;
+      transition: transform .25s ease, box-shadow .25s ease;
+      isolation: isolate;
+    }
+
+    .explore-card:hover {
+      transform: translateY(-7px);
+      box-shadow: 0 18px 30px rgba(0,0,0,.22);
+    }
+
+    .explore-card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      background: linear-gradient(to top, rgba(2,16,28,0.95), rgba(2,16,28,0.06) 70%);
+    }
+
+    .explore-welcome {
+      background-image: url("/static/images/himalaya2.jpg");
+    }
+
+    .explore-history {
+      background-image: url("/static/images/heritage.jpg");
+    }
+
+    .explore-culture {
+      background-image: url("/static/images/living.jpg");
+    }
+
+    .explore-food {
+      background:
+        linear-gradient(135deg, rgba(101, 65, 18, .30), rgba(40, 20, 5, .18)),
+        url("/static/images/food.jpg");
+    }
+
+    .explore-content {
+      position: absolute;
+      left: 19px;
+      right: 19px;
+      bottom: 19px;
+    }
+
+    .explore-icon {
+      display: block;
+      font-size: 30px;
+      margin-bottom: 18px;
+    }
+
+    .explore-number {
+      display: block;
+      color: var(--gold-light);
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: 1.8px;
+      margin-bottom: 7px;
+      text-transform: uppercase;
+    }
+
+    .explore-card h3 {
+      font-size: 22px;
+      color: #ffffff;
+      line-height: 1.1;
+      margin-bottom: 9px;
+    }
+
+    .explore-card p {
+      font-size: 12px;
+      color: rgba(255,255,255,0.80);
+      line-height: 1.5;
+      margin-bottom: 12px;
+    }
+
+    .explore-link {
+      font-size: 12px;
+      color: #ffffff;
+      font-weight: 900;
+    }
+
+    /* =====================================
+       QUICK INFORMATION BAR
+       ===================================== */
+
+    .quick-bar {
+      width: min(1240px, calc(100% - 40px));
+      margin: 0 auto 46px;
+      padding: 27px 30px;
+      border-radius: 20px;
+      background:
+        radial-gradient(circle at top right, rgba(229, 173, 66, 0.24), transparent 25%),
+        linear-gradient(135deg, var(--navy), #0d3d65);
+      box-shadow: 0 16px 33px rgba(3,25,44,.20);
+    }
+
+    .quick-bar-heading {
+      color: #ffffff;
+      font-size: 22px;
+      margin: 5px 0 18px;
+    }
+
+    .quick-bar .section-kicker {
+      color: var(--gold-light);
+    }
+
+    .quick-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 11px;
+    }
+
+    .quick-link {
+      min-height: 70px;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.15);
+      background: rgba(255,255,255,.08);
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      color: #ffffff;
+      transition: .2s ease;
+    }
+
+    .quick-link:hover {
+      transform: translateY(-3px);
+      background: rgba(255,255,255,.15);
+    }
+
+    .quick-icon {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border-radius: 10px;
+      background: rgba(245,205,115,.16);
+      font-size: 19px;
+    }
+
+    .quick-link strong,
+    .quick-link small {
+      display: block;
+    }
+
+    .quick-link strong {
+      font-size: 13px;
+    }
+
+    .quick-link small {
+      color: rgba(255,255,255,.65);
+      font-size: 10px;
+      margin-top: 2px;
+    }
+
+    .quick-arrow {
+      margin-left: auto;
+      color: var(--gold-light);
+      font-size: 19px;
+      font-weight: 800;
+    }
+
+    /* =====================================
+       MAIN SECTIONS
+       ===================================== */
+
+    .container {
+      width: min(1200px, calc(100% - 40px));
+      margin: 0 auto 60px;
+    }
+
+    .section-card {
+      position: relative;
+      overflow: hidden;
+      background: rgba(255,255,255,.97);
+      border: 1px solid rgba(211,223,225,.95);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-soft);
+      padding: 34px;
+      margin-bottom: 27px;
+    }
+
+    .section-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 6px;
+      background: linear-gradient(90deg, var(--green), var(--blue), var(--gold));
+    }
+
+    .section-header {
+      margin-bottom: 22px;
+    }
+
+    .section-header .section-kicker {
+      margin-bottom: 6px;
+      display: block;
+    }
+
+    .section-title {
+      font-size: clamp(1.7rem, 3vw, 2.35rem);
+      line-height: 1.15;
+      color: var(--navy);
+      font-weight: 900;
+    }
+
+    .section-intro {
+      margin-top: 10px;
+      color: var(--muted);
+      max-width: 850px;
+      font-size: 15px;
+    }
+
+    .split-layout {
+      display: grid;
+      grid-template-columns: minmax(300px, .87fr) 1.13fr;
+      gap: 30px;
+      align-items: stretch;
+    }
+
+    .section-photo-wrap {
+      position: relative;
+      border-radius: 18px;
+      overflow: hidden;
+      min-height: 360px;
+      background: #e6ecee;
+      box-shadow: 0 12px 28px rgba(12,34,48,.15);
+    }
+
+    .section-photo-wrap img {
+      width: 100%;
+      height: 100%;
+      min-height: 360px;
+      display: block;
+      object-fit: cover;
+      transition: transform .45s ease;
+    }
+
+    .section-photo-wrap:hover img {
+      transform: scale(1.05);
+    }
+
+    .photo-label {
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      bottom: 12px;
+      padding: 10px 12px;
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 700;
+      border-radius: 10px;
+      background: rgba(2,20,33,.70);
+      backdrop-filter: blur(8px);
+    }
+
+    .content-text p {
+      color: #27343a;
+      font-size: 15.5px;
+      margin-bottom: 14px;
+    }
+
+    .content-text ul {
+      margin: 13px 0 0 20px;
+      color: #27343a;
+      font-size: 15px;
+    }
+
+    .content-text li {
+      margin-bottom: 8px;
+    }
+
+    .subheading {
+      color: var(--green);
+      font-size: 19px;
+      font-weight: 900;
+      margin: 18px 0 8px;
+    }
+
+    /* Stats */
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 13px;
+      margin-top: 22px;
+    }
+
+    .stat-card {
+      padding: 17px;
+      min-height: 112px;
+      border-radius: 14px;
+      border: 1px solid #deebe5;
+      background: linear-gradient(135deg, #f5faf7, #ffffff);
+      transition: .2s ease;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 24px rgba(8,61,45,.11);
+    }
+
+    .stat-icon {
+      font-size: 21px;
+      margin-bottom: 8px;
+    }
+
+    .stat-card strong {
+      display: block;
+      color: var(--navy);
+      font-size: 20px;
+      line-height: 1.1;
+    }
+
+    .stat-card span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      margin-top: 4px;
+    }
+
+    /* History timeline */
+
+    .timeline {
+      position: relative;
+      margin-top: 5px;
+    }
+
+    .timeline::before {
+      content: "";
+      position: absolute;
+      left: 11px;
+      top: 8px;
+      bottom: 8px;
+      width: 2px;
+      background: linear-gradient(var(--gold), var(--green));
+    }
+
+    .timeline-item {
+      position: relative;
+      padding-left: 42px;
+      padding-bottom: 18px;
+    }
+
+    .timeline-item:last-child {
+      padding-bottom: 0;
+    }
+
+    .timeline-dot {
+      position: absolute;
+      top: 4px;
+      left: 3px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--white);
+      border: 4px solid var(--gold);
+      box-shadow: 0 0 0 4px #fff8e8;
+    }
+
+    .timeline-year {
+      color: var(--green);
+      font-size: 12px;
+      letter-spacing: 1px;
+      font-weight: 900;
+    }
+
+    .timeline-item h4 {
+      color: var(--navy);
+      margin: 2px 0 4px;
+      font-size: 16px;
+    }
+
+    .timeline-item p {
+      color: var(--muted);
+      font-size: 13px;
+      margin: 0;
+    }
+
+    /* Tabs */
+
+    .tabs {
+      margin-top: 12px;
+    }
+
+    .tab-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .tab-btn {
+      border: 1px solid #d6e2dc;
+      background: #f6faf8;
+      color: var(--green);
+      padding: 9px 13px;
+      font-size: 12px;
+      border-radius: 9px;
+      cursor: pointer;
+      font-weight: 900;
+      transition: .2s ease;
+    }
+
+    .tab-btn.active,
+    .tab-btn:hover {
+      background: var(--green);
+      color: #ffffff;
+      border-color: var(--green);
+    }
+
+    .tab-panel {
+      display: none;
+      padding: 18px;
+      border-radius: 14px;
+      background: #f8fbf9;
+      border: 1px solid #e1ece6;
+      animation: fadeTab .25s ease;
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    .tab-panel h4 {
+      color: var(--navy);
+      margin-bottom: 7px;
+      font-size: 18px;
+    }
+
+    .tab-panel p,
+    .tab-panel ul {
+      color: #344047;
+      font-size: 14px;
+    }
+
+    .tab-panel ul {
+      margin: 9px 0 0 19px;
+    }
+
+    /* Food cards */
+
+    .food-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 13px;
+      margin-top: 18px;
+    }
+
+    .food-item {
+      padding: 15px;
+      background: linear-gradient(135deg, #fffaf0, #ffffff);
+      border: 1px solid #f0e0b8;
+      border-radius: 14px;
+      transition: .2s ease;
+    }
+
+    .food-item:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 22px rgba(147, 96, 8, .12);
+    }
+
+    .food-item span {
+      display: block;
+      font-size: 22px;
+      margin-bottom: 5px;
+    }
+
+    .food-item h4 {
+      color: #72520f;
+      font-size: 15px;
+      margin-bottom: 4px;
+    }
+
+    .food-item p {
+      color: #695b44;
+      font-size: 12px;
+      margin: 0;
+      line-height: 1.5;
+    }
+
+    /* Tourism */
+
+    .tourism-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-top: 20px;
+    }
+
+    .tourism-card {
+      min-height: 236px;
+      overflow: hidden;
+      border-radius: 15px;
+      padding: 16px;
+      display: flex;
+      align-items: flex-end;
+      position: relative;
+      color: #ffffff;
+      background-size: cover;
+      background-position: center;
+      transition: transform .25s ease;
+      isolation: isolate;
+    }
+
+    .tourism-card:hover {
+      transform: translateY(-6px);
+    }
+
+    .tourism-card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      background: linear-gradient(to top, rgba(2,18,28,.92), rgba(2,18,28,.03) 70%);
+    }
+
+    .tourism-card-1 {
+      background-image: url("/static/images/khirsu.jpg");
+    }
+
+    .tourism-card-2 {
+      background-image: url("/static/images/chaukhamba.jpg");
+    }
+
+    .tourism-card-3 {
+      background-image: url("/static/images/landowne.jpg");
+    }
+
+    .tourism-card-4 {
+      background-image: url("/static/images/kanvashram.jpg");
+    }
+
+    .tourism-card h3 {
+      color: #ffffff;
+      font-size: 19px;
+      margin-bottom: 5px;
+      line-height: 1.1;
+    }
+
+    .tourism-card p {
+      color: rgba(255,255,255,.82);
+      font-size: 12px;
+      line-height: 1.45;
+      margin: 0;
+    }
+
+    /* Gallery */
+
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      grid-auto-rows: 130px;
+      gap: 14px;
+      margin-top: 20px;
+    }
+
+    .gallery-item {
+      overflow: hidden;
+      position: relative;
+      border-radius: 15px;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(8,30,44,.12);
+      background: #dde7e8;
+    }
+
+    .gallery-item:nth-child(1) {
+      grid-column: span 6;
+      grid-row: span 3;
+    }
+
+    .gallery-item:nth-child(2) {
+      grid-column: span 3;
+      grid-row: span 2;
+    }
+
+    .gallery-item:nth-child(3) {
+      grid-column: span 3;
+      grid-row: span 2;
+    }
+
+    .gallery-item:nth-child(4) {
+      grid-column: span 6;
+      grid-row: span 2;
+    }
+
+    .gallery-item:nth-child(5) {
+      grid-column: span 3;
+      grid-row: span 2;
+    }
+
+    .gallery-item:nth-child(6) {
+      grid-column: span 3;
+      grid-row: span 2;
+    }
+
+    .gallery-item img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: cover;
+      transition: transform .4s ease;
+    }
+
+    .gallery-item:hover img {
+      transform: scale(1.08);
+    }
+
+    .gallery-caption {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      padding: 18px 12px 11px;
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 800;
+      background: linear-gradient(to top, rgba(2,18,28,.86), transparent);
+      transform: translateY(2px);
+    }
+
+    /* Notice */
+
+    .notice {
+      margin-top: 21px;
+      padding: 15px 17px;
+      border-left: 5px solid var(--gold);
+      border-radius: 10px;
+      background: #fffaf0;
+      color: #66552b;
+      font-size: 13px;
+    }
+
+    /* Footer */
+
+    footer {
+      padding: 45px 20px;
+      background:
+        radial-gradient(circle at top right, rgba(229,173,66,.16), transparent 26%),
+        linear-gradient(135deg, #051c31, #0a3457);
+      color: rgba(255,255,255,.72);
+      text-align: center;
+    }
+
+    .footer-title {
+      color: #ffffff;
+      font-size: 19px;
+      font-weight: 900;
+      margin-bottom: 6px;
+    }
+
+    .footer-line {
+      width: 75px;
+      height: 3px;
+      background: var(--gold);
+      border-radius: 5px;
+      margin: 12px auto;
+    }
+
+    /* Back-to-top */
+
+    .back-top {
+      position: fixed;
+      width: 45px;
+      height: 45px;
+      right: 20px;
+      bottom: 20px;
+      z-index: 70;
+      border: 0;
+      border-radius: 50%;
+      color: #ffffff;
+      background: var(--green);
+      font-size: 21px;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(5, 57, 39, .28);
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(12px);
+      transition: .25s ease;
+    }
+
+    .back-top.show {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0);
+    }
+
+    .back-top:hover {
+      background: var(--navy);
+      transform: translateY(-3px);
+    }
+
+    /* Lightbox */
+
+    .lightbox {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 25px;
+      background: rgba(0,0,0,.86);
+    }
+
+    .lightbox.show {
+      display: flex;
+    }
+
+    .lightbox-content {
+      width: min(1000px, 96vw);
+      max-height: 90vh;
+      position: relative;
+    }
+
+    .lightbox img {
+      display: block;
+      max-height: 82vh;
+      width: 100%;
+      object-fit: contain;
+      background: #111;
+      border-radius: 13px;
+    }
+
+    .lightbox-caption {
+      color: #ffffff;
+      text-align: center;
+      margin-top: 10px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .lightbox-close {
+      position: absolute;
+      right: -5px;
+      top: -45px;
+      width: 36px;
+      height: 36px;
+      border: 0;
+      border-radius: 50%;
+      background: #ffffff;
+      color: var(--navy);
+      font-size: 23px;
+      cursor: pointer;
+      font-weight: 900;
+    }
+
+    /* Animations */
+
+    @keyframes slowZoom {
+      from { transform: scale(1.02); }
+      to { transform: scale(1.10); }
+    }
+
+    @keyframes heroEntrance {
+      from {
+        opacity: 0;
+        transform: translateY(22px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes bounceDown {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(5px); }
+    }
+
+    @keyframes fadeTab {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Responsive */
+
+    @media (max-width: 1050px) {
+      .explore-grid,
+      .tourism-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .quick-grid,
+      .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 820px) {
+      .top-strip-right {
+        display: none;
+      }
+
+      .header-inner {
+        min-height: 72px;
+      }
+
+      .brand-subtitle {
+        display: none;
+      }
+
+      .hero {
+        min-height: 680px;
+      }
+
+      .hero h1 {
+        font-size: clamp(3.7rem, 13vw, 6rem);
+        letter-spacing: -2px;
+      }
+
+      .split-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .section-photo-wrap,
+      .section-photo-wrap img {
+        min-height: 270px;
+      }
+
+      .explore-heading {
+        display: block;
+      }
+
+      .explore-heading p {
+        margin-top: 10px;
+      }
+    }
+
+    @media (max-width: 600px) {
+      .top-strip-inner,
+      .header-inner,
+      .nav-inner,
+      .hero-content,
+      .explore-wrap,
+      .quick-bar,
+      .container {
+        width: min(100% - 28px, 1240px);
+      }
+
+      .top-strip-left {
+        font-size: 10px;
+      }
+
+      .emblem {
+        width: 42px;
+        height: 42px;
+        font-size: 22px;
+      }
+
+      .brand-title {
+        font-size: 15px;
+      }
+
+      .header-actions .header-btn:last-child {
+        display: none;
+      }
+
+      .hero {
+        min-height: 650px;
+      }
+
+      .hero-content {
+        padding: 78px 0 92px;
+      }
+
+      .hero-kicker {
+        font-size: 10px;
+        letter-spacing: 2px;
+      }
+
+      .hero-description {
+        font-size: 1rem;
+      }
+
+      .hero-stat-row {
+        width: 100%;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+      }
+
+      .hero-stat {
+        min-width: 0;
+        padding: 0 8px;
+      }
+
+      .hero-stat strong {
+        font-size: 16px;
+      }
+
+      .hero-stat span {
+        font-size: 9px;
+      }
+
+      .explore-wrap {
+        margin-top: -46px;
+        padding: 20px 14px;
+        border-radius: 19px;
+      }
+
+      .explore-grid,
+      .quick-grid,
+      .tourism-grid,
+      .stats-grid,
+      .food-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .explore-card {
+        min-height: 260px;
+      }
+
+      .quick-bar {
+        padding: 22px 16px;
+      }
+
+      .section-card {
+        padding: 25px 16px;
+        border-radius: 18px;
+      }
+
+      .gallery-grid {
+        grid-template-columns: 1fr 1fr;
+        grid-auto-rows: 155px;
+      }
+
+      .gallery-item:nth-child(n) {
+        grid-column: span 1;
+        grid-row: span 1;
+      }
+
+      .gallery-item:nth-child(1) {
+        grid-column: span 2;
+        grid-row: span 2;
+      }
+    }
+
+    @media print {
+      .top-strip,
+      .site-header,
+      .main-nav,
+      .hero-actions,
+      .scroll-note,
+      .quick-bar,
+      .back-top {
+        display: none !important;
+      }
+
+      body {
+        background: #ffffff;
+      }
+
+      .hero {
+        min-height: 250px;
+      }
+
+      .explore-wrap {
+        margin-top: 20px;
+        box-shadow: none;
+      }
+
+      .section-card {
+        box-shadow: none;
+        break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- TOP STRIP -->
+  <div class="top-strip">
+    <div class="top-strip-inner">
+      <div class="top-strip-left">
+        <span><strong>Government Information Display</strong></span>
+        <span>District Profile · Pauri Garhwal</span>
+      </div>
+
+      <div class="top-strip-right">
+        <span>Uttarakhand · India</span>
+        <span>Public Information Portal</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- OFFICIAL HEADER -->
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="brand">
+        <div class="emblem">SPR</div>
+        <div>
+          <div class="brand-kicker">District Information Portal</div>
+          <div class="brand-title">Pauri Garhwal</div>
+          <div class="brand-subtitle">Garhwal Division · Uttarakhand · India</div>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button class="header-btn" onclick="document.body.classList.toggle('large-text')">A+</button>
+        <button class="header-btn" onclick="window.print()">Print</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- NAVIGATION -->
+  <nav class="main-nav">
+    <div class="nav-inner">
+      <a href="#overview">Overview</a>
+      <a href="#geography">Geography</a>
+      <a href="#history">History</a>
+      <a href="#culture">Culture</a>
+      <a href="#food">Food</a>
+      <a href="#demographics">Demographics</a>
+      <a href="#administration">Administration</a>
+      <a href="#tourism">Tourism</a>
+      <a href="#gallery">Gallery</a>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-image"></div>
+    <div class="hero-overlay"></div>
+    <div class="hero-pattern"></div>
+
+    <div class="hero-content">
+      <div class="hero-badge">
+        <span>🏔️</span>
+        <span>Official District Information Portal</span>
+      </div>
+
+      <div class="hero-kicker">GARHWAL DIVISION · UTTARAKHAND</div>
+
+      <h1>Pauri<br />Garhwal</h1>
+
+      <p class="hero-description">
+        A district of Himalayan landscapes, ancient sacred places, vibrant Garhwali traditions,
+        forested hills and welcoming communities.
+      </p>
+
+      <div class="hero-actions">
+        <a class="hero-btn hero-btn-primary" href="#overview">Explore the District</a>
+        <a class="hero-btn hero-btn-secondary" href="#tourism">Discover Tourism</a>
+      </div>
+
+      <div class="hero-stat-row">
+        <div class="hero-stat">
+          <strong>5,329 km²</strong>
+          <span>District Area</span>
+        </div>
+
+        <div class="hero-stat">
+          <strong>687,271</strong>
+          <span>Population · Census 2011</span>
+        </div>
+
+        <div class="hero-stat">
+          <strong>82.02%</strong>
+          <span>Literacy Rate</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="scroll-note">
+      <span>Scroll to explore</span>
+      <span class="scroll-circle">↓</span>
+    </div>
+  </section>
+
+  <!-- EXPLORE IMAGE CARDS -->
+  <section class="explore-wrap">
+    <div class="explore-heading">
+      <div>
+        <span class="section-kicker">Explore Pauri Garhwal</span>
+        <h2>One district. Many stories.</h2>
+      </div>
+
+      <p>
+        Discover the district through its mountains, history, people, cultural identity
+        and traditional Garhwali food.
+      </p>
+    </div>
+
+    <div class="explore-grid">
+      <a href="#overview" class="explore-card explore-welcome">
+        <div class="explore-content">
+          <span class="explore-icon">🏔️</span>
+          <span class="explore-number">01 · Welcome</span>
+          <h3>Himalayan Gateway</h3>
+          <p>Explore the landscape, identity and key facts of Pauri Garhwal.</p>
+          <span class="explore-link">View overview →</span>
+        </div>
+      </a>
+
+      <a href="#history" class="explore-card explore-history">
+        <div class="explore-content">
+          <span class="explore-icon">📜</span>
+          <span class="explore-number">02 · History</span>
+          <h3>Heritage of Garhwal</h3>
+          <p>Learn about the rulers, capitals and historical development of the region.</p>
+          <span class="explore-link">Read history →</span>
+        </div>
+      </a>
+
+      <a href="#culture" class="explore-card explore-culture">
+        <div class="explore-content">
+          <span class="explore-icon">🎶</span>
+          <span class="explore-number">03 · Culture</span>
+          <h3>Living Traditions</h3>
+          <p>Discover Garhwali language, festivals, folk music and community life.</p>
+          <span class="explore-link">Discover culture →</span>
+        </div>
+      </a>
+
+      <a href="#food" class="explore-card explore-food">
+        <div class="explore-content">
+          <span class="explore-icon">🍲</span>
+          <span class="explore-number">04 · Food</span>
+          <h3>Flavours of Garhwal</h3>
+          <p>Explore nutritious local food shaped by mountain farming and seasons.</p>
+          <span class="explore-link">Explore cuisine →</span>
+        </div>
+      </a>
+    </div>
+  </section>
+
+  <!-- QUICK ACCESS -->
+  <section class="quick-bar">
+    <span class="section-kicker">Quick Access</span>
+    <h2 class="quick-bar-heading">Information at a glance</h2>
+
+    <div class="quick-grid">
+      <a class="quick-link" href="#geography">
+        <span class="quick-icon">🌍</span>
+        <span>
+          <strong>Geography</strong>
+          <small>Location & climate</small>
+        </span>
+        <span class="quick-arrow">→</span>
+      </a>
+
+      <a class="quick-link" href="#history">
+        <span class="quick-icon">🏛️</span>
+        <span>
+          <strong>History</strong>
+          <small>Heritage & timeline</small>
+        </span>
+        <span class="quick-arrow">→</span>
+      </a>
+
+      <a class="quick-link" href="#tourism">
+        <span class="quick-icon">🧭</span>
+        <span>
+          <strong>Tourism</strong>
+          <small>Places to visit</small>
+        </span>
+        <span class="quick-arrow">→</span>
+      </a>
+
+      <a class="quick-link" href="#gallery">
+        <span class="quick-icon">📷</span>
+        <span>
+          <strong>Gallery</strong>
+          <small>District visuals</small>
+        </span>
+        <span class="quick-arrow">→</span>
+      </a>
+    </div>
+  </section>
+
+  <!-- MAIN CONTENT -->
+  <main class="container">
+
+    <!-- OVERVIEW -->
+    <section class="section-card" id="overview">
+      <div class="section-header">
+        <span class="section-kicker">District Profile</span>
+        <h2 class="section-title">Welcome to Pauri Garhwal</h2>
+        <p class="section-intro">
+          A beautiful district in Uttarakhand that connects the Gangetic plains with the Lower Himalayas.
+        </p>
+      </div>
+
+      <div class="split-layout">
+        <div class="section-photo-wrap">
+          <img src="/static/images/welcome.jpg" alt="Welcome to Pauri Garhwal" />
+          <div class="photo-label">Pauri Garhwal · Hills, valleys and Himalayan surroundings</div>
+        </div>
+
+        <div class="content-text">
+          <p>
+            Pauri Garhwal is located in the Garhwal division of Uttarakhand, India. Its terrain includes
+            fertile valleys, terraced agricultural land, pine and deodar forests, hill towns and distant
+            Himalayan views. The district headquarters is Pauri.
+          </p>
+
+          <p>
+            The district is valued for its scenic beauty, cultural heritage and spiritual importance.
+            Major settlements and service centres include Pauri, Kotdwar, Srinagar, Lansdowne,
+            Satpuli, Thalisain and Yamkeshwar.
+          </p>
+
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-icon">📍</div>
+              <strong>Pauri</strong>
+              <span>District Headquarters</span>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-icon">🗺️</div>
+              <strong>5,329 km²</strong>
+              <span>Total Area</span>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-icon">👥</div>
+              <strong>687,271</strong>
+              <span>Population · 2011</span>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-icon">📚</div>
+              <strong>82.02%</strong>
+              <span>Literacy Rate</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- GEOGRAPHY -->
+    <section class="section-card" id="geography">
+      <div class="section-header">
+        <span class="section-kicker">Land & Climate</span>
+        <h2 class="section-title">Geography and Climate</h2>
+      </div>
+
+      <div class="split-layout">
+        <div class="content-text">
+          <p>
+            Pauri Garhwal lies partly in the Gangetic plain and partly in the Lower Himalayas,
+            including the Shiwalik range. Its landscape varies from lower valleys to wooded mountain
+            ridges and high viewpoints.
+          </p>
+
+          <ul>
+            <li><strong>Coordinates:</strong> 29°45′–30°15′ N and 78°24′–79°23′ E</li>
+            <li><strong>Neighbouring areas:</strong> Haridwar, Dehradun, Tehri Garhwal, Rudraprayag, Chamoli, Almora, Nainital and Bijnor district of Uttar Pradesh</li>
+            <li><strong>Natural features:</strong> valleys, hills, forests, terraced fields and Himalayan viewpoints</li>
+            <li><strong>Climate:</strong> warm lower areas, pleasant hill summers, cold winters and monsoon greenery</li>
+          </ul>
+
+          <h3 class="subheading">Seasonal Character</h3>
+          <p>
+            Summer is warm in the lower regions, while the hills remain relatively pleasant.
+            Winter is cold and higher locations may receive snowfall. The monsoon season brings
+            rain, mist and a vivid green landscape.
+          </p>
+        </div>
+
+        <div class="section-photo-wrap">
+          <img src="/static/images/climate.jpg" alt="Geography and climate of Pauri Garhwal" />
+          <div class="photo-label">Panoramic Himalayan scenery from Pauri Garhwal</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- HISTORY -->
+    <section class="section-card" id="history">
+      <div class="section-header">
+        <span class="section-kicker">Past to Present</span>
+        <h2 class="section-title">History and Heritage</h2>
+        <p class="section-intro">
+          The district’s story is part of the broader history of the Garhwal Himalayan region.
+        </p>
+      </div>
+
+      <div class="split-layout">
+        <div class="section-photo-wrap">
+          <img src="/static/images/history.jpg" alt="History and heritage of Garhwal" />
+          <div class="photo-label">Garhwal heritage · Traditional mountain settlement and landscape</div>
+        </div>
+
+        <div class="timeline">
+          <div class="timeline-item">
+            <div class="timeline-dot"></div>
+            <div class="timeline-year">EARLY MEDIEVAL PERIOD</div>
+            <h4>Katyuri Influence</h4>
+            <p>
+              Parts of the Himalayan region were associated with the Katyuri dynasty between about the 9th and 12th centuries.
+            </p>
+          </div>
+
+          <div class="timeline-item">
+            <div class="timeline-dot"></div>
+            <div class="timeline-year">15TH CENTURY</div>
+            <h4>Rise of Chandpurgarh</h4>
+            <p>
+              Local principalities developed, and Chandpurgarh rose in importance under Jagatpal.
+            </p>
+          </div>
+
+          <div class="timeline-item">
+            <div class="timeline-dot"></div>
+            <div class="timeline-year">GARHWAL KINGDOM</div>
+            <h4>Unification Under Ajaypal</h4>
+            <p>
+              Ajaypal united many smaller territories. The region came to be known as Garhwal, and the capital later moved to Srinagar.
+            </p>
+          </div>
+
+          <div class="timeline-item">
+            <div class="timeline-dot"></div>
+            <div class="timeline-year">1804–1815</div>
+            <h4>Gorkha Rule and British Period</h4>
+            <p>
+              Gorkha rule lasted until 1815, when the British defeated the Gorkhas. Eastern Garhwal then came under British administration.
+            </p>
+          </div>
+
+          <div class="timeline-item">
+            <div class="timeline-dot"></div>
+            <div class="timeline-year">1960 & 1998</div>
+            <h4>Modern District Formation</h4>
+            <p>
+              Garhwal district was divided into Pauri Garhwal and Chamoli in 1960. Rudraprayag district was created in 1998.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CULTURE -->
+    <section class="section-card" id="culture">
+      <div class="section-header">
+        <span class="section-kicker">Garhwali Identity</span>
+        <h2 class="section-title">People, Culture and Traditions</h2>
+      </div>
+
+      <div class="split-layout">
+        <div class="section-photo-wrap">
+          <img src="/static/images/culture.png" alt="People, culture and traditions of Garhwal" />
+          <div class="photo-label">Pauri Garhwal · Landscape, people and community life</div>
+        </div>
+
+        <div class="content-text">
+          <p>
+            Pauri Garhwal has a rich Garhwali cultural identity. Garhwali is widely spoken in homes and villages,
+            while Hindi is used extensively in public administration, education and business.
+          </p>
+
+          <div class="tabs">
+            <div class="tab-buttons">
+              <button class="tab-btn active" data-tab="language">Language</button>
+              <button class="tab-btn" data-tab="music">Music & Dance</button>
+              <button class="tab-btn" data-tab="festivals">Festivals</button>
+              <button class="tab-btn" data-tab="community">Community Life</button>
+            </div>
+
+            <div class="tab-panel active" id="language">
+              <h4>Language</h4>
+              <p>
+                Garhwali is the predominant first language in the district. Hindi is widely used in schools,
+                offices and public communication. Nepali and Kumaoni are also spoken by parts of the population.
+              </p>
+            </div>
+
+            <div class="tab-panel" id="music">
+              <h4>Folk Music and Dance</h4>
+              <p>
+                Folk traditions include jagars and mangals, along with dance forms such as thadya,
+                chhapeli and virahi. These traditions are important during celebrations and social gatherings.
+              </p>
+            </div>
+
+            <div class="tab-panel" id="festivals">
+              <h4>Festivals and Fairs</h4>
+              <p>
+                Navratri, Shivratri, Diwali and Holi are widely celebrated. Local temple fairs and melas
+                also create opportunities for cultural expression and community participation.
+              </p>
+            </div>
+
+            <div class="tab-panel" id="community">
+              <h4>Community Life</h4>
+              <p>
+                Village customs, local deities, family networks, agriculture and seasonal festivals
+                continue to shape community life across Pauri Garhwal.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FOOD -->
+    <section class="section-card" id="food">
+      <div class="section-header">
+        <span class="section-kicker">Mountain Cuisine</span>
+        <h2 class="section-title">Traditional Food of Garhwal</h2>
+        <p class="section-intro">
+          Garhwali cuisine is shaped by local grains, pulses, seasonal vegetables and mountain agriculture.
+        </p>
+      </div>
+
+      <div class="split-layout">
+        <div class="section-photo-wrap">
+          <img src="/static/images/food.jpg" alt="Traditional food of Garhwal" />
+          <div class="photo-label">Traditional Garhwali and Uttarakhand cuisine</div>
+        </div>
+
+        <div class="content-text">
+          <p>
+            Local food is generally simple, nourishing and strongly connected to the crops grown in mountain
+            villages. Grains, lentils, dairy products and seasonal vegetables form the base of daily meals.
+          </p>
+
+          <div class="food-grid">
+            <div class="food-item">
+              <span>🌾</span>
+              <h4>Mandua Roti</h4>
+              <p>Traditional flatbread made with finger millet, an important mountain grain.</p>
+            </div>
+
+            <div class="food-item">
+              <span>🫘</span>
+              <h4>Bhatt Ki Churkani</h4>
+              <p>A regional preparation featuring bhatt, a locally valued black soybean.</p>
+            </div>
+
+            <div class="food-item">
+              <span>🍛</span>
+              <h4>Chainsoo</h4>
+              <p>A traditional roasted-pulse dish known for its rich and earthy flavour.</p>
+            </div>
+
+            <div class="food-item">
+              <span>🥣</span>
+              <h4>Gahat Dishes</h4>
+              <p>Horse gram preparations commonly served as dal or in warming soup-style meals.</p>
+            </div>
+          </div>
+
+          <h3 class="subheading">Everyday Food</h3>
+          <p>
+            Roti, rice, dal, leafy vegetables, milk, curd and ghee are common. Jaggery also has a place
+            in sweets and in religious offerings at local shrines.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- DEMOGRAPHICS -->
+    <section class="section-card" id="demographics">
+      <div class="section-header">
+        <span class="section-kicker">Census Profile</span>
+        <h2 class="section-title">Demographics</h2>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon">👥</div>
+          <strong>687,271</strong>
+          <span>Total Population · 2011</span>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon">📈</div>
+          <strong>−1.51%</strong>
+          <span>Growth · 2001–2011</span>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon">⚖️</div>
+          <strong>1,103</strong>
+          <span>Females per 1,000 Males</span>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon">📖</div>
+          <strong>82.02%</strong>
+          <span>Literacy Rate</span>
+        </div>
+      </div>
+
+      <div class="split-layout" style="margin-top: 28px;">
+        <div class="content-text">
+          <h3 class="subheading">Religion</h3>
+          <ul>
+            <li>Hinduism: 96.11%</li>
+            <li>Islam: 3.34%</li>
+            <li>Other / not stated: 0.55%</li>
+          </ul>
+        </div>
+
+        <div class="content-text">
+          <h3 class="subheading">First Languages</h3>
+          <ul>
+            <li>Garhwali: 83.3%</li>
+            <li>Hindi: 13.3%</li>
+            <li>Nepali: 1.2%</li>
+            <li>Kumaoni: 0.7%</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ADMINISTRATION -->
+    <section class="section-card" id="administration">
+      <div class="section-header">
+        <span class="section-kicker">District Services</span>
+        <h2 class="section-title">Administration, Education and Connectivity</h2>
+      </div>
+
+      <div class="split-layout">
+        <div class="content-text">
+          <h3 class="subheading">Administration</h3>
+          <ul>
+            <li>District headquarters: Pauri</li>
+            <li>Division: Garhwal</li>
+            <li>Administrative structure includes tehsils, sub-divisions, development blocks and villages</li>
+            <li>Lok Sabha constituency: Garhwal</li>
+            <li>Important towns: Pauri, Kotdwar, Srinagar, Lansdowne, Satpuli, Thalisain and Yamkeshwar</li>
+          </ul>
+
+          <h3 class="subheading">Connectivity</h3>
+          <ul>
+            <li>Road transport through buses and taxis is the main travel mode.</li>
+            <li>Kotdwar serves as the principal railway station / railhead for the district.</li>
+            <li>Jolly Grant Airport, Dehradun, is the nearest airport.</li>
+          </ul>
+        </div>
+
+        <div class="content-text">
+          <h3 class="subheading">Key Education Institutions</h3>
+          <ul>
+            <li>Hemwati Nandan Bahuguna Garhwal University, Srinagar</li>
+            <li>National Institute of Technology Uttarakhand, Srinagar</li>
+            <li>Veer Chandra Singh Garhwali Government Medical College, Srinagar</li>
+            <li>Govind Ballabh Pant Engineering College, Ghurdauri near Pauri</li>
+          </ul>
+
+          <h3 class="subheading">Economic Activities</h3>
+          <ul>
+            <li>Terraced agriculture, pulses, grains and seasonal vegetables</li>
+            <li>Fruit cultivation and horticulture in suitable higher areas</li>
+            <li>Tourism, education, government services and forest-related livelihoods</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- TOURISM -->
+    <section class="section-card" id="tourism">
+      <div class="section-header">
+        <span class="section-kicker">Explore & Experience</span>
+        <h2 class="section-title">Tourism and Places to Visit</h2>
+        <p class="section-intro">
+          Pauri Garhwal offers viewpoints, temple trails, hill stations, forests and peaceful mountain travel.
+        </p>
+      </div>
+
+      <div class="tourism-grid">
+        <div class="tourism-card tourism-card-1">
+          <div>
+            <h3>Khirsu</h3>
+            <p>Known for Himalayan views, orchards, forest surroundings and the Ghandiyal Devta temple.</p>
+          </div>
+        </div>
+
+        <div class="tourism-card tourism-card-2">
+          <div>
+            <h3>Chaukhamba View Point</h3>
+            <p>A scenic viewpoint near Pauri with views towards the Idwal Valley and Himalayan peaks.</p>
+          </div>
+        </div>
+
+        <div class="tourism-card tourism-card-3">
+          <div>
+            <h3>Lansdowne</h3>
+            <p>A peaceful hill station known for deodar forests, colonial heritage and quiet walking trails.</p>
+          </div>
+        </div>
+
+        <div class="tourism-card tourism-card-4">
+          <div>
+            <h3>Kanvashram</h3>
+            <p>A spiritual location associated with the traditions of Vishvamitra, Menaka and Shakuntala.</p>
+          </div>
+        </div>
+      </div>
+
+      <h3 class="subheading">Temples and Spiritual Heritage</h3>
+      <div class="content-text">
+        <p>
+          Major spiritual and religious places include Kandoliya Devta, Jwalpa Devi Temple,
+          Kyunkaleshwar Mahadev, Tarkeshwar Mahadev, Binsar Mahadev, Ekeshwar Mahadev,
+          Danda Nagraja Temple and Shoonya Shikhar Ashram near Kotdwar.
+        </p>
+      </div>
+    </section>
+
+    <!-- GALLERY -->
+    <section class="section-card" id="gallery">
+      <div class="section-header">
+        <span class="section-kicker">Visual Journey</span>
+        <h2 class="section-title">Pauri Garhwal Photo Gallery</h2>
+        <p class="section-intro">
+          Click any photograph to view it in a larger display.
+        </p>
+      </div>
+
+      <div class="gallery-grid">
+        <div class="gallery-item" data-image="/static/images/culture.png" data-caption="Garhwali culture and folk traditions">
+          <img src="/static/images/culture.png" alt="Garhwali culture" />
+          <div class="gallery-caption">Culture</div>
+        </div>
+        <div class="gallery-item" data-image="/static/images/himalaya2.jpg" data-caption="Himalayan views from Pauri Garhwal">
+          <img src="/static/images/himalaya2.jpg" alt="Himalayan view" />
+          <div class="gallery-caption">Himalaya</div>
+        </div>
+        <div class="gallery-item" data-image="/static/images/food.jpg" data-caption="Traditional flavours of Garhwal">
+          <img src="/static/images/food.jpg" alt="Traditional Garhwali food" />
+          <div class="gallery-caption">Food</div>
+        </div>
+        <div class="gallery-item" data-image="/static/images/nature.jpg" data-caption="Natural beauty of Pauri Garhwal">
+          <img src="/static/images/nature.jpg" alt="Nature in Pauri Garhwal" />
+          <div class="gallery-caption">Nature</div>
+        </div>
+        <div class="gallery-item" data-image="/static/images/welcome.jpg" data-caption="Welcome to Pauri Garhwal">
+          <img src="/static/images/welcome.jpg" alt="Welcome to Pauri Garhwal" />
+          <div class="gallery-caption">Welcome to Pauri</div>
+        </div>
+        <div class="gallery-item" data-image="/static/images/history.jpg" data-caption="History and heritage of Pauri Garhwal">
+          <img src="/static/images/history.jpg" alt="History of Pauri Garhwal" />
+          <div class="gallery-caption">History</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VISITOR INFORMATION -->
+    <section class="section-card" id="visitor-info">
+      <div class="section-header">
+        <span class="section-kicker">Travel Guidance</span>
+        <h2 class="section-title">Visitor Information</h2>
+      </div>
+
+      <div class="split-layout">
+        <div class="content-text">
+          <h3 class="subheading">Best Time to Visit</h3>
+          <ul>
+            <li>March to June: generally pleasant weather in hill areas.</li>
+            <li>September to November: post-monsoon greenery and clearer views.</li>
+            <li>December to February: cold conditions, with possible snowfall in higher locations.</li>
+          </ul>
+        </div>
+
+        <div class="content-text">
+          <h3 class="subheading">Responsible Travel</h3>
+          <ul>
+            <li>Respect local customs, temple rules and village traditions.</li>
+            <li>Seek permission before photographing people or religious rituals.</li>
+            <li>Avoid littering in forests, viewpoints, temples and trekking routes.</li>
+            <li>Check weather and road conditions before travel during monsoon season.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-title">Pauri Garhwal District Information Portal</div>
+    <div>Garhwal Division · Uttarakhand · India</div>
+    <div class="footer-line"></div>
+    <div>
+      This page is designed for informational and display purposes.
+      Verify all data with the latest official departmental records before formal publication.
+    </div>
+  </footer>
+
+  <!-- BACK TO TOP BUTTON -->
+  <button class="back-top" id="backTop" title="Back to top">↑</button>
+
+  <!-- IMAGE LIGHTBOX -->
+  <div class="lightbox" id="lightbox">
+    <div class="lightbox-content">
+      <button class="lightbox-close" id="lightboxClose" title="Close">×</button>
+      <img id="lightboxImage" src="" alt="Large gallery view" />
+      <div class="lightbox-caption" id="lightboxCaption"></div>
+    </div>
+  </div>
+
+  <script>
+    /* Tabs */
+
+    const tabButtons = document.querySelectorAll(".tab-btn");
+    const tabPanels = document.querySelectorAll(".tab-panel");
+
+    tabButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const target = button.dataset.tab;
+
+        tabButtons.forEach((btn) => btn.classList.remove("active"));
+        tabPanels.forEach((panel) => panel.classList.remove("active"));
+
+        button.classList.add("active");
+        document.getElementById(target).classList.add("active");
+      });
+    });
+
+    /* Back to top */
+
+    const backTop = document.getElementById("backTop");
+
+    window.addEventListener("scroll", () => {
+      if (window.scrollY > 500) {
+        backTop.classList.add("show");
+      } else {
+        backTop.classList.remove("show");
+      }
+    });
+
+    backTop.addEventListener("click", () => {
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+      });
+    });
+
+    /* Gallery lightbox */
+
+    const lightbox = document.getElementById("lightbox");
+    const lightboxImage = document.getElementById("lightboxImage");
+    const lightboxCaption = document.getElementById("lightboxCaption");
+    const lightboxClose = document.getElementById("lightboxClose");
+    const galleryItems = document.querySelectorAll(".gallery-item");
+
+    galleryItems.forEach((item) => {
+      item.addEventListener("click", () => {
+        lightboxImage.src = item.dataset.image;
+        lightboxCaption.textContent = item.dataset.caption;
+        lightbox.classList.add("show");
+        document.body.style.overflow = "hidden";
+      });
+    });
+
+    function closeLightbox() {
+      lightbox.classList.remove("show");
+      document.body.style.overflow = "";
+    }
+
+    lightboxClose.addEventListener("click", closeLightbox);
+
+    lightbox.addEventListener("click", (event) => {
+      if (event.target === lightbox) {
+        closeLightbox();
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        closeLightbox();
+      }
+    });
+  </script>
+
+</body>
+</html>

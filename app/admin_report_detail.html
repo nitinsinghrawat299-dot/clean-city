@@ -1,0 +1,104 @@
+{% extends "base_admin.html" %}
+{% block title %}Review Report #{{ '%03d' % c.report_number if c.report_number else c.id[:6] }} — SPR Admin{% endblock %}
+
+{% block content %}
+<div class="admin-topbar">
+  <div>
+    <a href="{{ url_for('admin') }}" class="btn btn-ghost btn-sm" style="margin-bottom:10px;">← Back to Reports</a>
+    <h1>Report #{{ '%03d' % c.report_number if c.report_number else c.id[:6] }}</h1>
+    <p>Review the photo, location and details before updating the status.</p>
+  </div>
+  <span class="status status-{{ c.status | lower | replace(' ', '') }}" style="font-size:.85rem; padding:8px 16px;">{{ c.status }}</span>
+</div>
+
+<div class="review-grid">
+  <!-- LEFT: photo + map -->
+  <div class="card">
+    <h3 style="font-size:1rem; margin-bottom:12px;">Photo</h3>
+    {% if c.image %}
+      <img src="{{ c.image }}" alt="Report photo" class="review-photo">
+    {% else %}
+      <div class="report-thumb report-thumb-empty" style="width:100%; height:260px; border-radius:12px;">No photo</div>
+    {% endif %}
+
+    <h3 style="font-size:1rem; margin:22px 0 12px;">Location</h3>
+    <p style="color:var(--text-muted); font-size:.9rem; margin-bottom:4px;"><strong style="color:var(--text-main);">Area:</strong> {{ c.location or '—' }}</p>
+    {% if c.address %}
+      <p style="color:var(--text-muted); font-size:.9rem; margin-bottom:12px;"><strong style="color:var(--text-main);">Address:</strong> {{ c.address }}</p>
+    {% endif %}
+
+    {% if c.coordinates %}
+      <iframe
+        class="review-map"
+        src="https://maps.google.com/maps?q={{ c.coordinates | urlencode }}&z=16&output=embed"
+        loading="lazy"
+        referrerpolicy="no-referrer-when-downgrade">
+      </iframe>
+      <a href="https://www.google.com/maps?q={{ c.coordinates | urlencode }}" target="_blank" rel="noopener" class="btn btn-ghost btn-block" style="margin-top:12px;">🗺️ Open in Google Maps</a>
+    {% elif c.address or c.location %}
+      <iframe
+        class="review-map"
+        src="https://maps.google.com/maps?q={{ (c.address or c.location) | urlencode }}&z=15&output=embed"
+        loading="lazy"
+        referrerpolicy="no-referrer-when-downgrade">
+      </iframe>
+      <a href="https://www.google.com/maps?q={{ (c.address or c.location) | urlencode }}" target="_blank" rel="noopener" class="btn btn-ghost btn-block" style="margin-top:12px;">🗺️ Open in Google Maps</a>
+      <p style="color:var(--text-faint); font-size:.78rem; margin-top:8px;">No exact GPS pin was captured for this report, so the map is centered from the typed location/address instead.</p>
+    {% else %}
+      <p style="color:var(--text-faint); font-size:.85rem;">No location data was provided for this report.</p>
+    {% endif %}
+  </div>
+
+  <!-- RIGHT: details + review actions -->
+  <div style="display:flex; flex-direction:column; gap:18px;">
+    <div class="card">
+      <h3 style="font-size:1rem; margin-bottom:12px;">Reported by</h3>
+      <div style="display:flex; align-items:center; gap:12px;">
+        {% if citizen and citizen.photo_url %}
+          <img src="{{ citizen.photo_url }}" alt="{{ c.citizen_username }}" class="review-avatar">
+        {% else %}
+          <div class="review-avatar review-avatar-empty">{{ (c.citizen_username or '?')[0] | upper }}</div>
+        {% endif %}
+        <div>
+          <strong>{{ c.citizen_username or '—' }}</strong>
+          {% if citizen and citizen.email %}<div style="color:var(--text-muted); font-size:.85rem;">{{ citizen.email }}</div>{% endif %}
+        </div>
+      </div>
+      <p style="color:var(--text-muted); font-size:.85rem; margin-top:12px;">Reported on {{ c.created_at.strftime('%d %b %Y, %I:%M %p') if c.created_at else '—' }}</p>
+    </div>
+
+    <div class="card">
+      <h3 style="font-size:1rem; margin-bottom:12px;">Description</h3>
+      <p style="color:var(--text-main); font-size:.92rem; line-height:1.55; white-space:pre-wrap;">{{ c.description or '(no description given)' }}</p>
+    </div>
+
+    <div class="card">
+      <h3 style="font-size:1rem; margin-bottom:14px;">Update status</h3>
+      <form method="POST" action="{{ url_for('update_status', complaint_id=c.id) }}" style="display:flex; flex-direction:column; gap:12px;">
+        <select name="status" class="search-input" onchange="toggleReason(this)">
+          <option value="Reported" {{ 'selected' if c.status=='Reported' }}>Reported</option>
+          <option value="In Progress" {{ 'selected' if c.status=='In Progress' }}>In Progress</option>
+          <option value="Resolved" {{ 'selected' if c.status=='Resolved' }}>Resolved</option>
+          <option value="Denied" {{ 'selected' if c.status=='Denied' }}>Denied</option>
+        </select>
+        <input type="text" name="reason" placeholder="Reason (required if denying)" class="search-input" value="{{ c.denial_reason or '' }}" style="{{ '' if c.status == 'Denied' else 'display:none;' }}">
+        <button type="submit" class="btn btn-primary btn-block">✔ Save Status</button>
+      </form>
+
+      <form method="POST" action="{{ url_for('delete_complaint', complaint_id=c.id) }}" onsubmit="return confirm('Delete this report permanently?');" style="margin-top:10px;">
+        <button type="submit" class="btn btn-ghost btn-block" style="color:var(--red-soft); border-color:rgba(217,45,45,.25);">🗑 Delete Report</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  function toggleReason(select) {
+    const reasonInput = select.closest('form').querySelector('input[name="reason"]');
+    reasonInput.style.display = select.value === 'Denied' ? 'block' : 'none';
+    reasonInput.required = select.value === 'Denied';
+  }
+</script>
+{% endblock %}
