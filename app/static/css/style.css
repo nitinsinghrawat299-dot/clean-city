@@ -426,3 +426,77 @@ header.site-header{background:rgba(255,255,255,.94);border-bottom:1px solid rgba
 .card,.step-card,.video-card,.stat-chip{background:#fff;color:var(--text-main);}
 .field input,.field textarea,.field select{background:#fff;color:var(--text-main);}
 .site-footer{background:#103d29!important;color:#dcece1;}
+
+/* =========================================================
+   SPR DYNAMIC HEADER — animated gradient hairline + sticky shrink
+   ========================================================= */
+header.site-header{
+  position:sticky; top:0; z-index:100;
+  backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+  transition:padding .35s var(--ease), box-shadow .35s var(--ease), background .35s var(--ease);
+}
+header.site-header::before{
+  content:""; position:absolute; left:0; right:0; bottom:-1px; height:2px;
+  background:conic-gradient(from var(--angle), #3ea55a, #7be59a, #6fd6c9, #f0b429, #3ea55a);
+  animation:spin 6s linear infinite;
+}
+header.site-header.is-scrolled{
+  box-shadow:0 12px 34px -18px rgba(18,58,37,.22);
+  background:rgba(255,255,255,.98);
+}
+header.site-header.is-scrolled nav.site-nav{padding-top:10px; padding-bottom:10px;}
+.logo-mark{
+  display:inline-flex; align-items:center; justify-content:center;
+  filter:drop-shadow(0 2px 8px rgba(62,165,90,.35));
+  animation:leafPulse 3.2s ease-in-out infinite;
+}
+@keyframes leafPulse{
+  0%,100%{transform:scale(1) rotate(0deg);}
+  50%{transform:scale(1.12) rotate(-6deg);}
+}
+.logo span{background:linear-gradient(90deg,var(--green-700),var(--green-500) 50%,var(--teal-mist));
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+  background-size:200% auto; animation:logoShine 5s ease-in-out infinite;
+}
+@keyframes logoShine{0%,100%{background-position:0% center;}50%{background-position:100% center;}}
+.nav-links a{
+  background-image:linear-gradient(90deg,var(--green-500),var(--teal-mist));
+  background-repeat:no-repeat; background-size:0% 2px; background-position:0 100%;
+  transition:background-size .3s var(--ease), color .2s var(--ease); padding-bottom:4px;
+}
+.nav-links a:hover, .nav-links a.active{background-size:100% 2px;}
+.nav-links a::after{display:none;}
+.btn-primary{
+  background:linear-gradient(135deg,var(--green-500),var(--green-700));
+  background-size:160% 160%; transition:background-position .5s var(--ease), transform .2s var(--ease), box-shadow .2s var(--ease);
+}
+.btn-primary:hover{background-position:100% 40%; transform:translateY(-2px); box-shadow:0 10px 26px -10px rgba(62,165,90,.55);}
+
+/* =========================================================
+   SPR DYNAMIC FOOTER — living gradient horizon + leaf drift
+   ========================================================= */
+footer.site-footer{position:relative; overflow:hidden; background:#0d3b26!important;}
+footer.site-footer::before{
+  content:""; position:absolute; inset:0; z-index:0; pointer-events:none;
+  background:
+    radial-gradient(60% 80% at 8% 0%, rgba(123,229,154,.16), transparent 60%),
+    radial-gradient(50% 70% at 96% 100%, rgba(111,214,201,.14), transparent 60%),
+    conic-gradient(from var(--angle), transparent 0deg, rgba(123,229,154,.10) 90deg, transparent 200deg);
+  animation:spin 14s linear infinite;
+}
+footer.site-footer::after{
+  content:"🌿"; position:absolute; z-index:0; pointer-events:none; opacity:.10;
+  font-size:220px; right:-40px; bottom:-60px; transform:rotate(-12deg);
+}
+footer.site-footer .wrap{position:relative; z-index:1;}
+.footer-grid h5{position:relative; padding-bottom:8px;}
+.footer-grid h5::after{
+  content:""; position:absolute; left:0; bottom:0; width:26px; height:2px;
+  background:linear-gradient(90deg,var(--green-bright),var(--teal-mist)); border-radius:2px;
+}
+.social-row a{transition:transform .25s var(--ease), background .25s var(--ease), border-color .25s var(--ease);}
+.footer-bottom{opacity:.85;}
+
+@media (prefers-reduced-motion: reduce){
+  header.site-header::before, footer.site-footer::before, .logo-mark, .logo span{animation:none!important;}
+}

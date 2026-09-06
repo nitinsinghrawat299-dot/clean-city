@@ -99,5 +99,13 @@
 {% endblock %}
 
 {% block extra_scripts %}{% endblock %}
+<script>
+  const __hdr = document.querySelector('header.site-header');
+  if (__hdr) {
+    const toggle = () => __hdr.classList.toggle('is-scrolled', window.scrollY > 12);
+    toggle();
+    window.addEventListener('scroll', toggle, { passive: true });
+  }
+</script>
 </body>
 </html>

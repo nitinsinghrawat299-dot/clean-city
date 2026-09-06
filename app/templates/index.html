@@ -1,12 +1,35 @@
 {% extends "base.html" %}
 {% block title %}Report an Issue — SPR{% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  .spr-steps{display:flex; gap:10px; margin-bottom:24px; flex-wrap:wrap;}
+  .spr-step{display:flex; align-items:center; gap:8px; font-size:.82rem; font-weight:700; color:var(--text-faint); padding:8px 14px; border:1px solid var(--border); border-radius:999px; background:#fff;}
+  .spr-step .n{width:20px; height:20px; border-radius:50%; background:var(--border); color:var(--text-muted); display:flex; align-items:center; justify-content:center; font-size:.72rem;}
+  .spr-step.done{color:var(--green-700); border-color:rgba(62,165,90,.35); background:rgba(123,229,154,.08);}
+  .spr-step.done .n{background:var(--green-500); color:#fff;}
+  .camera-box{position:relative; border-radius:14px; overflow:hidden; background:#0d2016; min-height:260px; display:flex; align-items:center; justify-content:center;}
+  .camera-box video, .camera-box img{width:100%; height:280px; object-fit:cover; display:block;}
+  .camera-placeholder{color:#c9dfd0; text-align:center; padding:30px 16px; font-size:.9rem;}
+  .camera-controls{display:flex; gap:10px; margin-top:12px; flex-wrap:wrap;}
+  #pinMap{height:300px; border-radius:14px; overflow:hidden; border:1px solid var(--border); margin-bottom:10px;}
+  .coord-readout{font-size:.8rem; color:var(--text-muted); margin-bottom:12px;}
+</style>
+{% endblock %}
+
 {% block content %}
 <section style="padding:44px 0;">
   <div class="wrap">
     <div class="dash-header">
       <h1>Report an Issue</h1>
-      <p>Help us keep {{ session.get('citizen_username', 'your') }}'s city clean by reporting issues you see, {{ session.get('citizen_username', 'citizen') }}.</p>
+      <p>Snap it, pin it, report it — help us keep {{ session.get('citizen_username', 'your') }}'s city clean, {{ session.get('citizen_username', 'citizen') }}.</p>
+    </div>
+
+    <div class="spr-steps">
+      <div class="spr-step" id="stepIndicator1"><span class="n">1</span> Snap Photo</div>
+      <div class="spr-step" id="stepIndicator2"><span class="n">2</span> Pin Location</div>
+      <div class="spr-step" id="stepIndicator3"><span class="n">3</span> Report</div>
     </div>
 
     <div class="dash-grid">
@@ -14,37 +37,58 @@
       <div class="card card-lg">
         <form method="POST" action="{{ url_for('submit') }}" enctype="multipart/form-data" id="reportForm">
 
+          <!-- STEP 1: SNAP -->
           <div class="field">
-            <label for="description">Description</label>
-            <textarea id="description" name="description" maxlength="1000" required placeholder="Describe the issue — what did you find, and how bad is it?"></textarea>
-          </div>
-
-          <div class="field">
-            <label for="location">Location</label>
-            <input type="text" id="location" name="location" required placeholder="Enter a location or area name">
-          </div>
-
-          <div class="field">
-            <label for="address">Address <span style="font-weight:400; color:var(--text-muted);">(optional)</span></label>
-            <input type="text" id="address" name="address" placeholder="Nearest landmark or address">
-          </div>
-
-          <input type="hidden" id="coordinates" name="coordinates" value="">
-
-          <div class="field">
-            <label>Upload Photo</label>
-            <label class="upload-drop" id="dropLabel">
-              <input type="file" name="image" id="imageInput" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp" required>
-              <div id="dropText">☁️ Click to upload or drag and drop<br><span style="font-size:.78rem;">PNG, JPG up to 8MB — must clearly show the garbage/litter</span></div>
-            </label>
-            <div class="upload-preview" id="previewWrap">
-              <img id="previewImg" src="" alt="Preview">
+            <label>📸 Step 1 — Snap a live photo</label>
+            <div class="camera-box" id="cameraBox">
+              <div class="camera-placeholder" id="cameraPlaceholder">
+                Your camera hasn't been opened yet.<br>
+                <span style="font-size:.8rem; opacity:.8;">Gallery uploads aren't accepted — this must be a live photo of the issue.</span>
+              </div>
+              <video id="cameraFeed" autoplay playsinline muted style="display:none;"></video>
+              <img id="capturedPreview" style="display:none;" alt="Captured photo">
             </div>
+            <canvas id="captureCanvas" style="display:none;"></canvas>
+            <input type="file" name="image" id="imageInput" accept="image/*" style="display:none;" required>
+            <div class="camera-controls">
+              <button type="button" class="btn btn-ghost" id="openCameraBtn">🎥 Open Camera</button>
+              <button type="button" class="btn btn-primary" id="captureBtn" style="display:none;">📸 Capture Photo</button>
+              <button type="button" class="btn btn-ghost" id="retakeBtn" style="display:none;">↺ Retake</button>
+            </div>
+            <div class="field-note" id="cameraError" style="display:none; color:var(--red);"></div>
+          </div>
+
+          <!-- STEP 2: PIN -->
+          <div class="field">
+            <label>📍 Step 2 — Pin the exact location</label>
+            <div id="pinMap"></div>
+            <div class="coord-readout" id="coordReadout">No location pinned yet — drag the pin or tap the map.</div>
+            <input type="hidden" id="coordinates" name="coordinates" value="">
+            <button type="button" class="btn btn-ghost" id="useLocationBtn">🎯 Center on My Current Location</button>
+          </div>
+
+          <!-- STEP 3: REPORT DETAILS -->
+          <div class="field">
+            <label>📝 Step 3 — Add details <span style="font-weight:400; color:var(--text-muted);">(all optional)</span></label>
+          </div>
+
+          <div class="field">
+            <label for="description">Description <span style="font-weight:400; color:var(--text-muted);">(optional)</span></label>
+            <textarea id="description" name="description" maxlength="1000" placeholder="Describe the issue — what did you find, and how bad is it?"></textarea>
+          </div>
+
+          <div class="field">
+            <label for="location">Area / Location name <span style="font-weight:400; color:var(--text-muted);">(optional)</span></label>
+            <input type="text" id="location" name="location" placeholder="e.g. Near bus stand, Ward 4">
+          </div>
+
+          <div class="field">
+            <label for="address">Nearest landmark <span style="font-weight:400; color:var(--text-muted);">(optional)</span></label>
+            <input type="text" id="address" name="address" placeholder="Nearest landmark or address">
           </div>
 
           <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:6px;">
             <button type="submit" class="btn btn-primary">Submit Report</button>
-            <button type="button" class="btn btn-ghost" id="useLocationBtn">📍 Use My Location</button>
           </div>
         </form>
       </div>
@@ -63,9 +107,9 @@
         <div class="card">
           <h3 style="font-size:1.05rem; margin-bottom:10px;">Tips for a good report</h3>
           <ul style="color:var(--text-muted); font-size:.88rem; padding-left:18px; display:flex; flex-direction:column; gap:8px;">
-            <li>Take the photo close enough that the garbage is clearly visible.</li>
-            <li>Use "Use My Location" so the municipality can find the exact spot.</li>
-            <li>Add a nearby landmark in Address if GPS isn't precise.</li>
+            <li>Only live camera photos are accepted — get close enough that the garbage is clearly visible.</li>
+            <li>Drag the map pin (or tap the map) to mark the exact spot.</li>
+            <li>Description and landmark are optional, but they help the municipality respond faster.</li>
           </ul>
         </div>
       </div>
@@ -75,42 +119,142 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+(function(){
+  // ---------- STEP INDICATORS ----------
+  const stepEls = {1: document.getElementById('stepIndicator1'), 2: document.getElementById('stepIndicator2'), 3: document.getElementById('stepIndicator3')};
+  function markDone(n){ if (stepEls[n]) stepEls[n].classList.add('done'); }
+
+  // ---------- STEP 1: LIVE CAMERA CAPTURE (no gallery access) ----------
+  const openCameraBtn = document.getElementById('openCameraBtn');
+  const captureBtn = document.getElementById('captureBtn');
+  const retakeBtn = document.getElementById('retakeBtn');
+  const cameraFeed = document.getElementById('cameraFeed');
+  const capturedPreview = document.getElementById('capturedPreview');
+  const cameraPlaceholder = document.getElementById('cameraPlaceholder');
+  const captureCanvas = document.getElementById('captureCanvas');
   const imageInput = document.getElementById('imageInput');
-  const previewWrap = document.getElementById('previewWrap');
-  const previewImg = document.getElementById('previewImg');
-  const dropText = document.getElementById('dropText');
+  const cameraError = document.getElementById('cameraError');
+  let mediaStream = null;
 
-  imageInput.addEventListener('change', () => {
-    const file = imageInput.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = e => {
-      previewImg.src = e.target.result;
-      previewWrap.style.display = 'block';
-      dropText.innerHTML = '✅ ' + file.name;
-    };
-    reader.readAsDataURL(file);
-  });
+  function showError(msg){ cameraError.textContent = msg; cameraError.style.display = 'block'; }
+  function hideError(){ cameraError.style.display = 'none'; }
 
-  document.getElementById('useLocationBtn').addEventListener('click', () => {
-    const btn = document.getElementById('useLocationBtn');
-    if (!navigator.geolocation) {
-      alert('Location access is not supported by this browser.');
+  function stopStream(){
+    if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+  }
+
+  openCameraBtn.addEventListener('click', async () => {
+    hideError();
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      showError('Your browser does not support live camera capture. Please try a modern browser (Chrome, Safari, Edge) with camera permission allowed.');
       return;
     }
+    try {
+      mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+      cameraPlaceholder.style.display = 'none';
+      capturedPreview.style.display = 'none';
+      cameraFeed.style.display = 'block';
+      cameraFeed.srcObject = mediaStream;
+      openCameraBtn.style.display = 'none';
+      captureBtn.style.display = 'inline-flex';
+      retakeBtn.style.display = 'none';
+    } catch (err) {
+      showError('Could not access your camera. Please allow camera permission for this site and try again.');
+    }
+  });
+
+  captureBtn.addEventListener('click', () => {
+    const w = cameraFeed.videoWidth || 720, h = cameraFeed.videoHeight || 540;
+    captureCanvas.width = w; captureCanvas.height = h;
+    captureCanvas.getContext('2d').drawImage(cameraFeed, 0, 0, w, h);
+    captureCanvas.toBlob((blob) => {
+      if (!blob) { showError('Could not capture photo. Please try again.'); return; }
+      const file = new File([blob], 'report-' + Date.now() + '.jpg', { type: 'image/jpeg' });
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      imageInput.files = dt.files;
+
+      capturedPreview.src = URL.createObjectURL(blob);
+      capturedPreview.style.display = 'block';
+      cameraFeed.style.display = 'none';
+      captureBtn.style.display = 'none';
+      retakeBtn.style.display = 'inline-flex';
+      stopStream();
+      markDone(1);
+    }, 'image/jpeg', 0.92);
+  });
+
+  retakeBtn.addEventListener('click', () => {
+    imageInput.value = '';
+    capturedPreview.style.display = 'none';
+    openCameraBtn.style.display = 'inline-flex';
+    captureBtn.style.display = 'none';
+    retakeBtn.style.display = 'none';
+    cameraPlaceholder.style.display = 'block';
+  });
+
+  // ---------- STEP 2: PIN LOCATION MAP ----------
+  const defaultCenter = [30.1489, 78.7803]; // Pauri Garhwal fallback center
+  const map = L.map('pinMap').setView(defaultCenter, 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors',
+    maxZoom: 19
+  }).addTo(map);
+
+  const marker = L.marker(defaultCenter, { draggable: true }).addTo(map);
+  const coordinatesInput = document.getElementById('coordinates');
+  const coordReadout = document.getElementById('coordReadout');
+
+  function setPin(lat, lng, recenter){
+    marker.setLatLng([lat, lng]);
+    if (recenter) map.setView([lat, lng], 16);
+    coordinatesInput.value = lat.toFixed(6) + ',' + lng.toFixed(6);
+    coordReadout.textContent = 'Pinned at ' + lat.toFixed(6) + ', ' + lng.toFixed(6);
+    markDone(2);
+  }
+
+  marker.on('dragend', () => {
+    const p = marker.getLatLng();
+    setPin(p.lat, p.lng, false);
+  });
+  map.on('click', (e) => setPin(e.latlng.lat, e.latlng.lng, false));
+
+  function tryAutoLocate(recenter){
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      pos => setPin(pos.coords.latitude, pos.coords.longitude, recenter),
+      () => { /* silently fall back to default center */ }
+    );
+  }
+  tryAutoLocate(true);
+
+  document.getElementById('useLocationBtn').addEventListener('click', function(){
+    const btn = this;
+    if (!navigator.geolocation) { alert('Location access is not supported by this browser.'); return; }
     btn.textContent = 'Locating…';
     navigator.geolocation.getCurrentPosition(
-      pos => {
-        document.getElementById('coordinates').value =
-          pos.coords.latitude.toFixed(6) + ',' + pos.coords.longitude.toFixed(6);
-        btn.textContent = '📍 Location captured';
-      },
-      () => {
-        btn.textContent = '📍 Use My Location';
-        alert('Could not get your location. You can still fill in Location/Address manually.');
-      }
+      pos => { setPin(pos.coords.latitude, pos.coords.longitude, true); btn.textContent = '🎯 Center on My Current Location'; },
+      () => { btn.textContent = '🎯 Center on My Current Location'; alert('Could not get your location. You can still drag the pin manually.'); }
     );
   });
+
+  // ---------- FORM VALIDATION ----------
+  document.getElementById('reportForm').addEventListener('submit', function(e){
+    if (!imageInput.files || imageInput.files.length === 0) {
+      e.preventDefault();
+      showError('Please capture a live photo before submitting.');
+      window.scrollTo({ top: document.getElementById('cameraBox').offsetTop - 100, behavior: 'smooth' });
+      return;
+    }
+    if (!coordinatesInput.value) {
+      e.preventDefault();
+      alert('Please pin your location on the map before submitting.');
+      return;
+    }
+    markDone(3);
+  });
+})();
 </script>
 {% endblock %}
