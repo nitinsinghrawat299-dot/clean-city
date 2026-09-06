@@ -1,4 +1,5 @@
-import os, sqlite3, uuid, datetime, secrets, smtplib, ssl
+import os, uuid, datetime, secrets, smtplib, ssl
+import psycopg2, psycopg2.extras, psycopg2.errors
 from email.mime.text import MIMEText
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -10,7 +11,7 @@ app=Flask(__name__); app.secret_key=os.getenv('SECRET_KEY','clean-city-local-sec
 app.jinja_env.globals['category_label']=lambda ck,sk: category_label(ck,sk)
 app.config['PERMANENT_SESSION_LIFETIME']=datetime.timedelta(days=14)
 UPLOAD=os.path.join(BASE,'static','uploads'); os.makedirs(UPLOAD,exist_ok=True)
-DB=os.path.join(BASE,'clean_city.db'); ALLOWED={'png','jpg','jpeg','gif','webp'}
+DATABASE_URL=os.getenv('DATABASE_URL'); ALLOWED={'png','jpg','jpeg','gif','webp'}
 ADMIN_USERNAME=os.getenv('ADMIN_USERNAME','admin'); ADMIN_PASSWORD_HASH=os.getenv('ADMIN_PASSWORD_HASH','')
 
 # ---- Complaint categories & subcategories ----
@@ -58,22 +59,29 @@ def category_label(cat_key,sub_key):
  return cat['icon']+' '+sub['title']
 
 def conn():
- c=sqlite3.connect(DB); c.row_factory=sqlite3.Row; return c
+ c=psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor); return c
+
+def _pg(q): return q.replace('?','%s')  # lets every existing '?' placeholder work unchanged
 
 def init_db():
- c=conn(); c.executescript('''CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,username TEXT UNIQUE,email TEXT UNIQUE,password TEXT,points INTEGER DEFAULT 0,reset_token TEXT,reset_token_expires TEXT,created_at TEXT);CREATE TABLE IF NOT EXISTS complaints(id TEXT PRIMARY KEY,report_number INTEGER UNIQUE,name TEXT,description TEXT,location TEXT,image TEXT,status TEXT,coordinates TEXT,address TEXT,citizen_id TEXT,points_awarded INTEGER DEFAULT 0,denial_reason TEXT DEFAULT '',created_at TEXT,category TEXT,subcategory TEXT);''')
+ c=conn(); cur=c.cursor()
+ cur.execute('''CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,username TEXT UNIQUE,email TEXT UNIQUE,password TEXT,points INTEGER DEFAULT 0,reset_token TEXT,reset_token_expires TEXT,created_at TEXT)''')
+ cur.execute('''CREATE TABLE IF NOT EXISTS complaints(id TEXT PRIMARY KEY,report_number INTEGER UNIQUE,name TEXT,description TEXT,location TEXT,image TEXT,status TEXT,coordinates TEXT,address TEXT,citizen_id TEXT,points_awarded INTEGER DEFAULT 0,denial_reason TEXT DEFAULT '',created_at TEXT,category TEXT,subcategory TEXT)''')
+ c.commit()
  # migration for pre-existing databases created before category/subcategory existed
  for col in ('category','subcategory'):
-  try: c.execute(f'ALTER TABLE complaints ADD COLUMN {col} TEXT')
-  except sqlite3.OperationalError: pass
- c.commit(); c.close()
+  try:
+   cur.execute(f'ALTER TABLE complaints ADD COLUMN {col} TEXT'); c.commit()
+  except psycopg2.errors.DuplicateColumn:
+   c.rollback()
+ cur.close(); c.close()
 init_db()
 def rows(q,p=()):
- c=conn(); r=c.execute(q,p).fetchall(); c.close(); return r
+ c=conn(); cur=c.cursor(); cur.execute(_pg(q),p); r=cur.fetchall(); cur.close(); c.close(); return r
 def one(q,p=()):
- c=conn(); r=c.execute(q,p).fetchone(); c.close(); return r
+ c=conn(); cur=c.cursor(); cur.execute(_pg(q),p); r=cur.fetchone(); cur.close(); c.close(); return r
 def run(q,p=()):
- c=conn(); c.execute(q,p); c.commit(); c.close()
+ c=conn(); cur=c.cursor(); cur.execute(_pg(q),p); c.commit(); cur.close(); c.close()
 def badge(points):
  return ('🌱','Green Starter') if points<20 else ('🌿','Eco Hero') if points<50 else ('🏆','Clean City Champion')
 def allowed(n): return '.' in n and n.rsplit('.',1)[1].lower() in ALLOWED
