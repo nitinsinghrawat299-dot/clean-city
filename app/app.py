@@ -10,7 +10,7 @@ app=Flask(__name__); app.secret_key=os.getenv('SECRET_KEY','clean-city-local-sec
 app.config['PERMANENT_SESSION_LIFETIME']=datetime.timedelta(days=14)
 UPLOAD=os.path.join(BASE,'static','uploads'); os.makedirs(UPLOAD,exist_ok=True)
 DB=os.path.join(BASE,'clean_city.db'); ALLOWED={'png','jpg','jpeg','gif','webp'}
-ADMIN_USERNAME=os.getenv('ADMIN_USERNAME','admin'); ADMIN_PASSWORD=os.getenv('ADMIN_PASSWORD','admin123')
+ADMIN_USERNAME=os.getenv('ADMIN_USERNAME','admin'); ADMIN_PASSWORD_HASH=os.getenv('ADMIN_PASSWORD_HASH','')
 
 def conn():
  c=sqlite3.connect(DB); c.row_factory=sqlite3.Row; return c
@@ -73,10 +73,10 @@ def submit():
  f=request.files.get('image');
  if not f or not f.filename or not allowed(f.filename): flash('Please upload a valid image.'); return redirect(url_for('home'))
  num=one('SELECT COALESCE(MAX(report_number),0)+1 n FROM complaints')['n']; cid=uuid.uuid4().hex; img=save_image(f)
-run('INSERT INTO complaints VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',(cid,num,session.get('citizen_username','Citizen'),request.form.get('description','')[:1000],request.form.get('location',''),img,'Reported',request.form.get('coordinates',''),request.form.get('address',''),session['citizen_id'],0,'',datetime.datetime.utcnow().isoformat())); flash('🎉 Report received!'); return redirect(url_for('profile'))
+ run('INSERT INTO complaints VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',(cid,num,session.get('citizen_username','Citizen'),request.form.get('description','')[:1000],request.form.get('location',''),img,'Reported',request.form.get('coordinates',''),request.form.get('address',''),session['citizen_id'],0,'',datetime.datetime.utcnow().isoformat())); flash('🎉 Report received!'); return redirect(url_for('profile'))
 @app.route('/login',methods=['GET','POST'])
 def login():
- if request.method=='POST' and request.form.get('username')==ADMIN_USERNAME and request.form.get('password')==ADMIN_PASSWORD: session['admin_logged_in']=True; return redirect(url_for('admin'))
+ if request.method=='POST' and request.form.get('username')==ADMIN_USERNAME and ADMIN_PASSWORD_HASH and check_password_hash(ADMIN_PASSWORD_HASH,request.form.get('password','')): session['admin_logged_in']=True; return redirect(url_for('admin'))
  if request.method=='POST': flash('Wrong municipality username or password.')
  return render_template('login.html')
 @app.route('/logout')
