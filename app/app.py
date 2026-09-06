@@ -27,6 +27,9 @@ def run(q,p=()):
 def badge(points):
  return ('🌱','Green Starter') if points<20 else ('🌿','Eco Hero') if points<50 else ('🏆','Clean City Champion')
 def allowed(n): return '.' in n and n.rsplit('.',1)[1].lower() in ALLOWED
+def parse_dt(s):
+ try: return datetime.datetime.fromisoformat(s) if s else None
+ except Exception: return None
 
 def save_image(f):
  ext=f.filename.rsplit('.',1)[1].lower(); name=f'{uuid.uuid4().hex}.{ext}'; f.save(os.path.join(UPLOAD,name)); return url_for('static',filename='uploads/'+name)
@@ -56,7 +59,7 @@ def citizen_logout(): session.clear(); return redirect(url_for('citizen_login'))
 @app.route('/profile')
 def profile():
  if not session.get('citizen_id'): return redirect(url_for('citizen_login'))
- u=one('SELECT * FROM users WHERE id=?',(session['citizen_id'],)); reps=rows('SELECT * FROM complaints WHERE citizen_id=? ORDER BY created_at DESC',(session['citizen_id'],)); icon,name=badge(u['points']); return render_template('profile.html',user=dict(u),reports=[dict(x) for x in reps],badge_icon=icon,badge_name=name)
+ u=one('SELECT * FROM users WHERE id=?',(session['citizen_id'],)); reps=rows('SELECT * FROM complaints WHERE citizen_id=? ORDER BY created_at DESC',(session['citizen_id'],)); icon,name=badge(u['points']); total=len(reps); resolved=sum(1 for x in reps if x['status']=='Resolved'); return render_template('profile.html',user=dict(u),reports=[dict(x) for x in reps],badge_icon=icon,badge_name=name,total=total,resolved=resolved)
 @app.route('/delete-account',methods=['POST'])
 def delete_account():
  if session.get('citizen_id'): run('DELETE FROM users WHERE id=?',(session['citizen_id'],)); session.clear(); flash('Account deleted.')
@@ -84,7 +87,11 @@ def logout(): session.pop('admin_logged_in',None); return redirect(url_for('logi
 @app.route('/admin')
 def admin():
  if not session.get('admin_logged_in'): return redirect(url_for('login'))
- q='SELECT c.*,u.username citizen_username FROM complaints c LEFT JOIN users u ON c.citizen_id=u.id ORDER BY c.created_at DESC'; return render_template('admin.html',complaints=[dict(x) for x in rows(q)])
+ q='SELECT c.*,u.username citizen_username FROM complaints c LEFT JOIN users u ON c.citizen_id=u.id ORDER BY c.created_at DESC'
+ comps=[]
+ for x in rows(q):
+  d=dict(x); d['created_at']=parse_dt(d['created_at']); comps.append(d)
+ return render_template('admin.html',complaints=comps)
 @app.route('/admin/users')
 def admin_users():
  if not session.get('admin_logged_in'): return redirect(url_for('login'))
