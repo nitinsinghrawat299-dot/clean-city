@@ -1,0 +1,35 @@
+{% extends "base_admin.html" %}
+{% block title %}Manage Reports — SPR Admin{% endblock %}
+
+{% block content %}
+<div class="admin-topbar">
+  <div>
+    <h1>Manage Reports</h1>
+    <p>Choose a category to review its reports.</p>
+  </div>
+</div>
+
+<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:20px;">
+  {% for t in tiles %}
+    <a href="{{ url_for('admin_reports', cat_key=t.cat_key) }}" class="card" style="display:block; position:relative; text-decoration:none; color:inherit;">
+      {% if t.pending > 0 %}
+        <span class="cat-badge">{{ t.pending }}</span>
+      {% endif %}
+      <div style="font-size:2.2rem; margin-bottom:10px;">{{ t.icon }}</div>
+      <h3 style="font-size:1.05rem; margin-bottom:6px;">{{ t.title }}</h3>
+      <p style="color:var(--text-muted); font-size:.85rem;">{{ t.pending }} pending report{{ 's' if t.pending != 1 }}</p>
+    </a>
+  {% endfor %}
+
+  {% if total_uncategorized > 0 %}
+    <a href="{{ url_for('admin_reports', cat_key='uncategorized') }}" class="card" style="display:block; position:relative; text-decoration:none; color:inherit;">
+      {% if uncategorized_pending > 0 %}
+        <span class="cat-badge">{{ uncategorized_pending }}</span>
+      {% endif %}
+      <div style="font-size:2.2rem; margin-bottom:10px;">🗂️</div>
+      <h3 style="font-size:1.05rem; margin-bottom:6px;">Uncategorized</h3>
+      <p style="color:var(--text-muted); font-size:.85rem;">{{ uncategorized_pending }} pending report{{ 's' if uncategorized_pending != 1 }}</p>
+    </a>
+  {% endif %}
+</div>
+{% endblock %}
