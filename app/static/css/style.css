@@ -497,6 +497,40 @@ footer.site-footer .wrap{position:relative; z-index:1;}
 .social-row a{transition:transform .25s var(--ease), background .25s var(--ease), border-color .25s var(--ease);}
 .footer-bottom{opacity:.85;}
 
+/* =========================================================
+   SPR FOOTER TEXT FIX — force light text regardless of light theme
+   ========================================================= */
+.site-footer, .site-footer *{--text-main:#f4faf5; --text-muted:#cfe4d6; --text-faint:#9fc0aa; --border:rgba(255,255,255,.14);}
+.footer-grid a{color:var(--text-muted)!important;}
+.footer-grid a:hover{color:var(--green-bright)!important;}
+.social-row a{color:#f4faf5;}
+.social-row a svg{width:17px; height:17px; fill:currentColor;}
+.footer-contact-list{list-style:none; display:flex; flex-direction:column; gap:9px; color:var(--text-muted); font-size:.86rem;}
+.footer-contact-list li{display:flex; align-items:flex-start; gap:8px;}
+.footer-contact-list .ico{flex:0 0 auto; opacity:.85;}
+
+/* =========================================================
+   SPR HEADER — stronger presence (govt civic bar, not just white blur)
+   ========================================================= */
+header.site-header{
+  background:linear-gradient(135deg,#0f3f27 0%, #1a5c37 55%, #10462d 100%);
+  box-shadow:0 10px 30px -14px rgba(10,40,24,.45);
+}
+header.site-header.is-scrolled{background:linear-gradient(135deg,#0d3a24 0%, #17552f 55%, #0f4128 100%);}
+header.site-header::before{height:3px;}
+nav.site-nav{padding-top:18px; padding-bottom:18px;}
+.logo span, .logo{color:#eafff0;}
+.logo span{
+  background:linear-gradient(90deg,#eafff0,#a6f5bb 50%,#6fd6c9);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+.logo small{color:rgba(234,255,240,.65)!important;}
+.nav-links a{color:rgba(234,255,240,.82)!important;}
+.nav-links a:hover, .nav-links a.active{color:#fff!important;}
+.nav-actions .btn-ghost{background:rgba(255,255,255,.08); color:#eafff0; border-color:rgba(255,255,255,.25);}
+.nav-actions .btn-ghost:hover{background:rgba(255,255,255,.16); border-color:rgba(255,255,255,.4);}
+.nav-avatar{background:rgba(255,255,255,.12); color:#eafff0; border:1px solid rgba(255,255,255,.25);}
+
 @media (prefers-reduced-motion: reduce){
   header.site-header::before, footer.site-footer::before, .logo-mark, .logo span{animation:none!important;}
 }
