@@ -4,7 +4,7 @@
 {% block content %}
 <div class="admin-topbar">
   <div>
-    <a href="{{ url_for('admin') }}" class="btn btn-ghost btn-sm" style="margin-bottom:10px;">← Back to Reports</a>
+    <a href="{{ back_url }}" class="btn btn-ghost btn-sm" style="margin-bottom:10px;">← Back to Reports</a>
     <h1>Report #{{ '%03d' % c.report_number if c.report_number else c.id[:6] }}</h1>
     <p>Review the photo, location and details before updating the status.</p>
   </div>
@@ -75,6 +75,7 @@
     <div class="card">
       <h3 style="font-size:1rem; margin-bottom:14px;">Update status</h3>
       <form method="POST" action="{{ url_for('update_status', complaint_id=c.id) }}" style="display:flex; flex-direction:column; gap:12px;">
+        <input type="hidden" name="cat_key" value="{{ request.args.get('from_cat','') }}">
         <select name="status" class="search-input" onchange="toggleReason(this)">
           <option value="Reported" {{ 'selected' if c.status=='Reported' }}>Reported</option>
           <option value="In Progress" {{ 'selected' if c.status=='In Progress' }}>In Progress</option>
@@ -86,6 +87,7 @@
       </form>
 
       <form method="POST" action="{{ url_for('delete_complaint', complaint_id=c.id) }}" onsubmit="return confirm('Delete this report permanently?');" style="margin-top:10px;">
+        <input type="hidden" name="cat_key" value="{{ request.args.get('from_cat','') }}">
         <button type="submit" class="btn btn-ghost btn-block" style="color:var(--red-soft); border-color:rgba(217,45,45,.25);">🗑 Delete Report</button>
       </form>
     </div>

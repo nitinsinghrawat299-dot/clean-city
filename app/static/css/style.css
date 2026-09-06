@@ -545,3 +545,28 @@ header.site-header .logo small{color:rgba(234,255,240,.65)!important;}
 .photo-capture img{width:100%; max-height:320px; object-fit:cover; border-radius:var(--radius-sm);}
 .photo-placeholder{display:flex; flex-direction:column; align-items:center; gap:8px; color:var(--text-faint); font-size:.88rem; padding:30px 0;}
 .report-map{width:100%; height:260px; border-radius:var(--radius-sm); overflow:hidden; border:1px solid var(--border); margin-bottom:8px;}
+
+/* =========================================================
+   SPR ADMIN — category tile pending-count badge
+   ========================================================= */
+.cat-badge{
+  position:absolute; top:-10px; right:-10px; min-width:26px; height:26px; padding:0 7px;
+  border-radius:999px; background:var(--red); color:#fff; font-family:'Sora',sans-serif;
+  font-weight:800; font-size:.82rem; display:flex; align-items:center; justify-content:center;
+  box-shadow:var(--shadow-glow-red), 0 0 0 3px var(--bg-panel);
+}
+
+/* =========================================================
+   SPR ADMIN — report table thumbnail + report detail page
+   ========================================================= */
+.report-thumb-sm{width:38px; height:38px; object-fit:cover; border-radius:8px; flex-shrink:0;}
+.review-grid{display:grid; grid-template-columns:1.1fr 1fr; gap:24px; align-items:start;}
+@media (max-width:900px){.review-grid{grid-template-columns:1fr;}}
+.review-photo{width:100%; max-height:340px; object-fit:cover; border-radius:12px; display:block;}
+.review-map{width:100%; height:220px; border:0; border-radius:12px; display:block;}
+.review-avatar{width:48px; height:48px; border-radius:50%; object-fit:cover;}
+.review-avatar-empty{
+  width:48px; height:48px; border-radius:50%; background:var(--green-glow); color:#fff;
+  display:flex; align-items:center; justify-content:center; font-weight:800; font-family:'Sora',sans-serif;
+}
+.report-thumb-empty{display:flex; align-items:center; justify-content:center; background:var(--bg-panel-2); color:var(--text-faint); font-size:.85rem;}

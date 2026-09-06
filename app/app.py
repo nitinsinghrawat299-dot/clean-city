@@ -68,7 +68,6 @@ def init_db():
  cur.execute('''CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,username TEXT UNIQUE,email TEXT UNIQUE,password TEXT,points INTEGER DEFAULT 0,reset_token TEXT,reset_token_expires TEXT,created_at TEXT)''')
  cur.execute('''CREATE TABLE IF NOT EXISTS complaints(id TEXT PRIMARY KEY,report_number INTEGER UNIQUE,name TEXT,description TEXT,location TEXT,image TEXT,status TEXT,coordinates TEXT,address TEXT,citizen_id TEXT,points_awarded INTEGER DEFAULT 0,denial_reason TEXT DEFAULT '',created_at TEXT,category TEXT,subcategory TEXT)''')
  c.commit()
- # migration for pre-existing databases created before category/subcategory existed
  for col in ('category','subcategory'):
   try:
    cur.execute(f'ALTER TABLE complaints ADD COLUMN {col} TEXT'); c.commit()
@@ -189,6 +188,16 @@ def admin_reports(cat_key):
  for x in rows(q,(cat_key,)):
   d=dict(x); d['created_at']=parse_dt(d['created_at']); comps.append(d)
  return render_template('admin.html',complaints=comps,cat_title=cat['icon']+' '+cat['title'],cat_key=cat_key)
+@app.route('/admin/report/<complaint_id>')
+def admin_report_detail(complaint_id):
+ if not session.get('admin_logged_in'): return redirect(url_for('login'))
+ x=one('SELECT c.*,u.username citizen_username FROM complaints c LEFT JOIN users u ON c.citizen_id=u.id WHERE c.id=?',(complaint_id,))
+ if not x: return redirect(url_for('admin'))
+ c=dict(x); c['created_at']=parse_dt(c['created_at'])
+ citizen=one('SELECT * FROM users WHERE id=?',(c['citizen_id'],)) if c['citizen_id'] else None
+ from_cat=request.args.get('from_cat','')
+ back_url=url_for('admin_reports',cat_key=from_cat) if from_cat else url_for('admin')
+ return render_template('admin_report_detail.html',c=c,citizen=citizen,back_url=back_url)
 @app.route('/admin/users')
 def admin_users():
  if not session.get('admin_logged_in'): return redirect(url_for('login'))
