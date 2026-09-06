@@ -1,15 +1,17 @@
 {% extends "base_admin.html" %}
-{% block title %}Manage Reports — SPR Admin{% endblock %}
+{% block title %}{{ cat_title or 'Manage Reports' }} — SPR Admin{% endblock %}
 
 {% block content %}
 {% set resolved_count = complaints | selectattr('status','equalto','Resolved') | list | length %}
 {% set denied_count = complaints | selectattr('status','equalto','Denied') | list | length %}
 {% set pending_count = complaints | length - resolved_count - denied_count %}
 
+<a href="{{ url_for('admin') }}" class="btn btn-ghost btn-sm" style="margin-bottom:16px;">← Back to Categories</a>
+
 <div class="admin-topbar">
   <div>
-    <h1>Manage Reports</h1>
-    <p>View and manage all reported issues.</p>
+    <h1>{{ cat_title or 'Manage Reports' }}</h1>
+    <p>View and manage reported issues{{ ' in this category' if cat_title }}.</p>
   </div>
   <input type="text" class="search-input" id="reportSearch" placeholder="Search reports…" onkeyup="filterReports()">
 </div>
@@ -51,6 +53,7 @@
           <td>
             <div class="row-actions">
               <form method="POST" action="{{ url_for('update_status', complaint_id=c.id) }}" class="status-form" style="display:flex; gap:6px; align-items:center;">
+                <input type="hidden" name="cat_key" value="{{ cat_key or '' }}">
                 <select name="status" class="search-input" style="min-width:120px; padding:6px 10px;" onchange="toggleReason(this)">
                   <option value="Reported" {{ 'selected' if c.status=='Reported' }}>Reported</option>
                   <option value="In Progress" {{ 'selected' if c.status=='In Progress' }}>In Progress</option>
@@ -61,6 +64,7 @@
                 <button type="submit" class="icon-btn" title="Update status">✔</button>
               </form>
               <form method="POST" action="{{ url_for('delete_complaint', complaint_id=c.id) }}" onsubmit="return confirm('Delete this report permanently?');">
+                <input type="hidden" name="cat_key" value="{{ cat_key or '' }}">
                 <button type="submit" class="icon-btn danger" title="Delete report">🗑</button>
               </form>
             </div>
