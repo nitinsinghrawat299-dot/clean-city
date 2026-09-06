@@ -7,16 +7,66 @@ from dotenv import load_dotenv
 
 load_dotenv(); BASE=os.path.dirname(os.path.abspath(__file__))
 app=Flask(__name__); app.secret_key=os.getenv('SECRET_KEY','clean-city-local-secret-change-me')
+app.jinja_env.globals['category_label']=lambda ck,sk: category_label(ck,sk)
 app.config['PERMANENT_SESSION_LIFETIME']=datetime.timedelta(days=14)
 UPLOAD=os.path.join(BASE,'static','uploads'); os.makedirs(UPLOAD,exist_ok=True)
 DB=os.path.join(BASE,'clean_city.db'); ALLOWED={'png','jpg','jpeg','gif','webp'}
 ADMIN_USERNAME=os.getenv('ADMIN_USERNAME','admin'); ADMIN_PASSWORD_HASH=os.getenv('ADMIN_PASSWORD_HASH','')
 
+# ---- Complaint categories & subcategories ----
+# 'enabled': True subcategories use the existing Snap-Pin-Report form.
+# 'enabled': False subcategories are shown in the menu but are not yet wired up (placeholder page).
+CATEGORIES={
+ 'waste':{'title':'Waste & Garbage Management','icon':'🗑️','subcats':{
+   'dirty-spot':{'title':'Cleanliness Target Unit (Dirty Spot)','enabled':True},
+   'garbage-dump':{'title':'Garbage Dump','enabled':True},
+   'garbage-vehicle':{'title':'Garbage Vehicle Not Arrived','enabled':False},
+   'open-burning':{'title':'Burning of Garbage in Open Space','enabled':True},
+   'sweeping':{'title':'Sweeping Not Done','enabled':True},
+   'dustbins':{'title':'Dustbins Not Cleaned','enabled':True},
+   'debris':{'title':'Removal of Debris / Construction Material','enabled':True},
+   'wild-grass':{'title':'Wild Grass Cutting','enabled':True},
+ }},
+ 'infra':{'title':'Public Infrastructure & Street Maintenance','icon':'💡','subcats':{
+   'open-manhole':{'title':'Open Manholes or Drains','enabled':True},
+   'unsafe-manhole':{'title':'Unsafe Manhole Entry','enabled':True},
+   'repair-streetlight':{'title':'Repair Street Light','enabled':True},
+   'streetlight-required':{'title':'Street Light Required','enabled':True},
+ }},
+ 'toilet':{'title':'Public Toilet & Sanitation Issues','icon':'🚻','subcats':{
+   'open-defecation':{'title':'Open Defecation','enabled':True},
+   'yellow-spot':{'title':'Yellow Spot (Public Urination Spot)','enabled':True},
+   'no-electricity':{'title':'No Electricity in Public Toilet','enabled':False},
+   'no-water':{'title':'No Water Supply in Public Toilet','enabled':False},
+   'blockage':{'title':'Blockage in Public Toilet','enabled':True},
+   'uncleaned':{'title':'Uncleaning Public Toilet','enabled':True},
+   'fecal-disposal':{'title':'Improper Disposal of Fecal Waste / Septage','enabled':True},
+ }},
+ 'water':{'title':'Water, Drainage & Miscellaneous','icon':'💧','subcats':{
+   'sewerage-overflow':{'title':'Overflow of Sewerage or Storm Water','enabled':True},
+   'stagnant-water':{'title':'Stagnant Water on Road / Open Area','enabled':True},
+   'septic-overflow':{'title':'Overflow of Septic Tanks','enabled':True},
+   'dead-animal':{'title':'Removal of Dead Animals','enabled':True},
+   'other-complaint':{'title':'Complaint Other Citizen Make','enabled':False},
+ }},
+}
+def category_label(cat_key,sub_key):
+ cat=CATEGORIES.get(cat_key)
+ if not cat: return ''
+ sub=cat['subcats'].get(sub_key)
+ if not sub: return cat['icon']+' '+cat['title']
+ return cat['icon']+' '+sub['title']
+
 def conn():
  c=sqlite3.connect(DB); c.row_factory=sqlite3.Row; return c
 
 def init_db():
- c=conn(); c.executescript('''CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,username TEXT UNIQUE,email TEXT UNIQUE,password TEXT,points INTEGER DEFAULT 0,reset_token TEXT,reset_token_expires TEXT,created_at TEXT);CREATE TABLE IF NOT EXISTS complaints(id TEXT PRIMARY KEY,report_number INTEGER UNIQUE,name TEXT,description TEXT,location TEXT,image TEXT,status TEXT,coordinates TEXT,address TEXT,citizen_id TEXT,points_awarded INTEGER DEFAULT 0,denial_reason TEXT DEFAULT '',created_at TEXT);'''); c.commit(); c.close()
+ c=conn(); c.executescript('''CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,username TEXT UNIQUE,email TEXT UNIQUE,password TEXT,points INTEGER DEFAULT 0,reset_token TEXT,reset_token_expires TEXT,created_at TEXT);CREATE TABLE IF NOT EXISTS complaints(id TEXT PRIMARY KEY,report_number INTEGER UNIQUE,name TEXT,description TEXT,location TEXT,image TEXT,status TEXT,coordinates TEXT,address TEXT,citizen_id TEXT,points_awarded INTEGER DEFAULT 0,denial_reason TEXT DEFAULT '',created_at TEXT,category TEXT,subcategory TEXT);''')
+ # migration for pre-existing databases created before category/subcategory existed
+ for col in ('category','subcategory'):
+  try: c.execute(f'ALTER TABLE complaints ADD COLUMN {col} TEXT')
+  except sqlite3.OperationalError: pass
+ c.commit(); c.close()
 init_db()
 def rows(q,p=()):
  c=conn(); r=c.execute(q,p).fetchall(); c.close(); return r
@@ -36,8 +86,22 @@ def save_image(f):
 
 @app.route('/')
 def home():
- if session.get('citizen_id'): return render_template('index.html')
+ if session.get('citizen_id'): return render_template('categories.html',categories=CATEGORIES)
  stats={'reports':str(one('SELECT COUNT(*) n FROM complaints')['n']),'users':str(one('SELECT COUNT(*) n FROM users')['n']),'points':str(one('SELECT COALESCE(SUM(points),0) n FROM users')['n']),'areas':str(one("SELECT COUNT(*) n FROM complaints WHERE status='Resolved'")['n'])}; return render_template('landing.html',stats=stats)
+@app.route('/report/<cat_key>')
+def report_category(cat_key):
+ if not session.get('citizen_id'): return redirect(url_for('citizen_login'))
+ cat=CATEGORIES.get(cat_key)
+ if not cat: return redirect(url_for('home'))
+ return render_template('subcategories.html',cat_key=cat_key,category=cat)
+@app.route('/report/<cat_key>/<sub_key>')
+def report_subcategory(cat_key,sub_key):
+ if not session.get('citizen_id'): return redirect(url_for('citizen_login'))
+ cat=CATEGORIES.get(cat_key)
+ sub=cat['subcats'].get(sub_key) if cat else None
+ if not cat or not sub: return redirect(url_for('home'))
+ if not sub['enabled']: return render_template('report_unavailable.html',cat_key=cat_key,category=cat,subcategory=sub)
+ return render_template('report_form.html',cat_key=cat_key,sub_key=sub_key,category=cat,subcategory=sub)
 @app.route('/register',methods=['GET','POST'])
 def register():
  if request.method=='POST':
@@ -59,7 +123,7 @@ def citizen_logout(): session.clear(); return redirect(url_for('citizen_login'))
 @app.route('/profile')
 def profile():
  if not session.get('citizen_id'): return redirect(url_for('citizen_login'))
- u=one('SELECT * FROM users WHERE id=?',(session['citizen_id'],)); reps=rows('SELECT * FROM complaints WHERE citizen_id=? ORDER BY created_at DESC',(session['citizen_id'],)); icon,name=badge(u['points']); total=len(reps); resolved=sum(1 for x in reps if x['status']=='Resolved'); return render_template('profile.html',user=dict(u),reports=[dict(x) for x in reps],badge_icon=icon,badge_name=name,total=total,resolved=resolved)
+ u=one('SELECT * FROM users WHERE id=?',(session['citizen_id'],)); reps=rows('SELECT * FROM complaints WHERE citizen_id=? ORDER BY created_at DESC',(session['citizen_id'],)); icon,name=badge(u['points']); total=len(reps); resolved=sum(1 for x in reps if x['status']=='Resolved'); return render_template('profile.html',user=dict(u),complaints=[dict(x) for x in reps],badge_icon=icon,badge_name=name,total=total,resolved=resolved)
 @app.route('/delete-account',methods=['POST'])
 def delete_account():
  if session.get('citizen_id'): run('DELETE FROM users WHERE id=?',(session['citizen_id'],)); session.clear(); flash('Account deleted.')
@@ -73,10 +137,13 @@ def leaderboard():
 @app.route('/submit',methods=['POST'])
 def submit():
  if not session.get('citizen_id'): return redirect(url_for('citizen_login'))
+ cat_key=request.form.get('category',''); sub_key=request.form.get('subcategory','')
+ cat=CATEGORIES.get(cat_key); sub=cat['subcats'].get(sub_key) if cat else None
+ if not cat or not sub or not sub['enabled']: flash('Please choose a valid, available complaint type.'); return redirect(url_for('home'))
  f=request.files.get('image');
- if not f or not f.filename or not allowed(f.filename): flash('Please upload a valid image.'); return redirect(url_for('home'))
+ if not f or not f.filename or not allowed(f.filename): flash('Please upload a valid image.'); return redirect(url_for('report_subcategory',cat_key=cat_key,sub_key=sub_key))
  num=one('SELECT COALESCE(MAX(report_number),0)+1 n FROM complaints')['n']; cid=uuid.uuid4().hex; img=save_image(f)
- run('INSERT INTO complaints VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',(cid,num,session.get('citizen_username','Citizen'),request.form.get('description','')[:1000],request.form.get('location',''),img,'Reported',request.form.get('coordinates',''),request.form.get('address',''),session['citizen_id'],0,'',datetime.datetime.utcnow().isoformat())); flash('🎉 Report received!'); return redirect(url_for('profile'))
+ run('INSERT INTO complaints VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',(cid,num,session.get('citizen_username','Citizen'),request.form.get('description','')[:1000],request.form.get('location',''),img,'Reported',request.form.get('coordinates',''),request.form.get('address',''),session['citizen_id'],0,'',datetime.datetime.utcnow().isoformat(),cat_key,sub_key)); flash('🎉 Report received!'); return redirect(url_for('profile'))
 @app.route('/login',methods=['GET','POST'])
 def login():
  if request.method=='POST' and request.form.get('username')==ADMIN_USERNAME and ADMIN_PASSWORD_HASH and check_password_hash(ADMIN_PASSWORD_HASH,request.form.get('password','')): session['admin_logged_in']=True; return redirect(url_for('admin'))

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Report an Issue — SPR{% endblock %}
+
+{% block content %}
+<section style="padding:44px 0;">
+  <div class="wrap">
+    <div class="dash-header">
+      <h1>Report an Issue</h1>
+      <p>Choose the category that best matches the problem you'd like to report, {{ session.get('citizen_username', 'citizen') }}.</p>
+    </div>
+
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:20px;">
+      {% for cat_key, cat in categories.items() %}
+        <a href="{{ url_for('report_category', cat_key=cat_key) }}" class="card" style="display:block; text-decoration:none; color:inherit;">
+          <div style="font-size:2.2rem; margin-bottom:10px;">{{ cat.icon }}</div>
+          <h3 style="font-size:1.05rem; margin-bottom:6px;">{{ cat.title }}</h3>
+          <p style="color:var(--text-muted); font-size:.85rem;">{{ cat.subcats|length }} report type{{ 's' if cat.subcats|length != 1 }}</p>
+        </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endblock %}

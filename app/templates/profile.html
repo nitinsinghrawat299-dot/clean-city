@@ -40,6 +40,7 @@
                   <div class="activity-thumb"></div>
                 {% endif %}
                 <div class="activity-body" style="flex:1;">
+                  {% if c.category %}<div style="font-size:.78rem; color:var(--text-muted); margin-bottom:2px;">{{ category_label(c.category, c.subcategory) }}</div>{% endif %}
                   <h4>{{ c.description[:80] }}{{ '…' if c.description|length > 80 }}</h4>
                   <p>📍 {{ c.location }}{% if c.address %} · {{ c.address }}{% endif %}</p>
                   {% if c.status == 'Denied' and c.denial_reason %}
