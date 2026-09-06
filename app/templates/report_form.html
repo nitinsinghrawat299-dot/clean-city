@@ -36,9 +36,10 @@
 
         <div class="field">
           <label>2. Pin Your Location</label>
-          <div id="reportMap" class="report-map" style="display:none;"></div>
           <p class="field-note" id="locationStatus">No location pinned yet.</p>
-          <button type="button" class="btn btn-primary btn-sm" id="pinLocationBtn" style="margin-top:8px;">📍 Pin My Location</button>
+          <button type="button" class="btn btn-primary btn-sm" id="pinLocationBtn" style="margin-bottom:12px;">📍 Pin My Location</button>
+          <div id="reportMap" class="report-map" style="display:none;"></div>
+          <p class="field-note" id="mapError" style="display:none; color:var(--red-soft);"></p>
         </div>
 
         <div class="field" id="addressField" style="display:none;">
@@ -63,8 +64,8 @@
   </div>
 </section>
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 (function(){
   var imageInput=document.getElementById('imageInput');
@@ -74,6 +75,7 @@
   var photoPlaceholder=document.getElementById('photoPlaceholder');
   var pinLocationBtn=document.getElementById('pinLocationBtn');
   var mapDiv=document.getElementById('reportMap');
+  var mapError=document.getElementById('mapError');
   var locationStatus=document.getElementById('locationStatus');
   var coordinatesInput=document.getElementById('coordinates');
   var addressField=document.getElementById('addressField');
@@ -125,24 +127,39 @@
   function dropPin(lat,lng){
     coordinatesInput.value = lat+','+lng;
     mapDiv.style.display='block';
-    if(!map){
-      map=L.map('reportMap').setView([lat,lng],16);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-        maxZoom:19, attribution:'&copy; OpenStreetMap contributors'
-      }).addTo(map);
-      marker=L.marker([lat,lng],{draggable:true}).addTo(map);
-      marker.on('dragend', function(){
-        var p=marker.getLatLng();
-        var plat=p.lat.toFixed(6), plng=p.lng.toFixed(6);
-        coordinatesInput.value = plat+','+plng;
-        locationStatus.textContent='📍 Location pinned — drag the marker to fine-tune.';
-        reverseGeocode(plat,plng);
-      });
-    } else {
-      map.setView([lat,lng],16);
-      marker.setLatLng([lat,lng]);
+    mapError.style.display='none';
+    if(typeof L === 'undefined'){
+      mapError.textContent='⚠️ The map couldn\'t load (check your internet connection), but your location was still captured.';
+      mapError.style.display='block';
+      mapDiv.style.display='none';
+      hasLocation=true; checkReady();
+      reverseGeocode(lat,lng);
+      return;
     }
-    setTimeout(function(){ map.invalidateSize(); }, 200);
+    try{
+      if(!map){
+        map=L.map('reportMap').setView([lat,lng],16);
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
+          maxZoom:19, attribution:'&copy; OpenStreetMap contributors'
+        }).addTo(map);
+        marker=L.marker([lat,lng],{draggable:true}).addTo(map);
+        marker.on('dragend', function(){
+          var p=marker.getLatLng();
+          var plat=p.lat.toFixed(6), plng=p.lng.toFixed(6);
+          coordinatesInput.value = plat+','+plng;
+          locationStatus.textContent='📍 Location pinned — drag the marker to fine-tune.';
+          reverseGeocode(plat,plng);
+        });
+      } else {
+        map.setView([lat,lng],16);
+        marker.setLatLng([lat,lng]);
+      }
+      setTimeout(function(){ map.invalidateSize(); }, 200);
+    } catch(err){
+      mapError.textContent='⚠️ The map couldn\'t load, but your location was still captured.';
+      mapError.style.display='block';
+      mapDiv.style.display='none';
+    }
     locationStatus.textContent='📍 Location pinned — drag the marker to fine-tune.';
     reverseGeocode(lat,lng);
     hasLocation=true; checkReady();
