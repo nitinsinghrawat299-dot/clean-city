@@ -67,6 +67,7 @@ def init_db():
  c=conn(); cur=c.cursor()
  cur.execute('''CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,username TEXT UNIQUE,email TEXT UNIQUE,password TEXT,points INTEGER DEFAULT 0,reset_token TEXT,reset_token_expires TEXT,created_at TEXT)''')
  cur.execute('''CREATE TABLE IF NOT EXISTS complaints(id TEXT PRIMARY KEY,report_number INTEGER UNIQUE,name TEXT,description TEXT,location TEXT,image TEXT,status TEXT,coordinates TEXT,address TEXT,citizen_id TEXT,points_awarded INTEGER DEFAULT 0,denial_reason TEXT DEFAULT '',created_at TEXT,category TEXT,subcategory TEXT)''')
+ cur.execute('''CREATE TABLE IF NOT EXISTS visits(id TEXT PRIMARY KEY,created_at TEXT)''')
  c.commit()
  for col in ('category','subcategory'):
   try:
@@ -90,6 +91,29 @@ def parse_dt(s):
 
 def save_image(f):
  ext=f.filename.rsplit('.',1)[1].lower(); name=f'{uuid.uuid4().hex}.{ext}'; f.save(os.path.join(UPLOAD,name)); return url_for('static',filename='uploads/'+name)
+
+# ---- Site visit tracking (for the admin "Site Visits" widget) ----
+@app.before_request
+def track_visit():
+ if request.endpoint=='static' or request.path.startswith('/static'): return
+ if session.get('admin_logged_in'): return  # don't count the admin's own browsing
+ if not session.get('_visited'):
+  run('INSERT INTO visits VALUES(?,?)',(uuid.uuid4().hex,datetime.datetime.utcnow().isoformat()))
+  session['_visited']=True
+
+@app.context_processor
+def inject_visit_stats():
+ if not session.get('admin_logged_in'): return {}
+ now=datetime.datetime.utcnow()
+ today_start=now.replace(hour=0,minute=0,second=0,microsecond=0).isoformat()
+ week_start=(now-datetime.timedelta(days=7)).isoformat()
+ month_start=(now-datetime.timedelta(days=30)).isoformat()
+ return {'visit_stats':{
+  'today':one('SELECT COUNT(*) n FROM visits WHERE created_at>=?',(today_start,))['n'],
+  'week':one('SELECT COUNT(*) n FROM visits WHERE created_at>=?',(week_start,))['n'],
+  'month':one('SELECT COUNT(*) n FROM visits WHERE created_at>=?',(month_start,))['n'],
+  'all':one('SELECT COUNT(*) n FROM visits')['n'],
+ }}
 
 @app.route('/')
 def home():

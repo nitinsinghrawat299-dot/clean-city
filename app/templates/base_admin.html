@@ -26,6 +26,21 @@
   </aside>
 
   <div class="admin-main">
+    <div style="display:flex; justify-content:flex-end; margin-bottom:18px;">
+      <div class="card" style="padding:14px 20px; display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+        <div style="text-align:center; min-width:70px;">
+          <div class="num" id="visitorCount" style="font-size:1.5rem; font-weight:800; color:var(--green-700, #126b3c); line-height:1;">{{ visit_stats.today }}</div>
+          <div style="font-size:.7rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; margin-top:2px;">👁 Site Visits</div>
+        </div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          <button type="button" class="pill active" data-count="{{ visit_stats.today }}">Today</button>
+          <button type="button" class="pill" data-count="{{ visit_stats.week }}">Last 7 Days</button>
+          <button type="button" class="pill" data-count="{{ visit_stats.month }}">Last 30 Days</button>
+          <button type="button" class="pill" data-count="{{ visit_stats.all }}">All Time</button>
+        </div>
+      </div>
+    </div>
+
     {% with messages = get_flashed_messages() %}
       {% if messages %}
         <div style="margin-bottom:18px;">
@@ -39,6 +54,16 @@
     {% block content %}{% endblock %}
   </div>
 </div>
+
+<script>
+document.querySelectorAll('.pill[data-count]').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    document.querySelectorAll('.pill[data-count]').forEach(function(b){ b.classList.remove('active'); });
+    this.classList.add('active');
+    document.getElementById('visitorCount').textContent = this.dataset.count;
+  });
+});
+</script>
 
 {% block extra_scripts %}{% endblock %}
 </body>
