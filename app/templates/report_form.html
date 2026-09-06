@@ -41,6 +41,11 @@
           <button type="button" class="btn btn-primary btn-sm" id="pinLocationBtn" style="margin-top:8px;">📍 Pin My Location</button>
         </div>
 
+        <div class="field" id="addressField" style="display:none;">
+          <label for="address">Address <span style="font-weight:400; color:var(--text-faint);">(auto-filled from your pin — edit if needed)</span></label>
+          <input type="text" id="address" name="address" placeholder="Address will appear here once you pin a location">
+        </div>
+
         <div class="field">
           <label for="description">3. Description</label>
           <textarea id="description" name="description" required maxlength="1000" placeholder="Describe what you're reporting..."></textarea>
@@ -71,6 +76,8 @@
   var mapDiv=document.getElementById('reportMap');
   var locationStatus=document.getElementById('locationStatus');
   var coordinatesInput=document.getElementById('coordinates');
+  var addressField=document.getElementById('addressField');
+  var addressInput=document.getElementById('address');
   var submitBtn=document.getElementById('submitBtn');
   var submitHint=document.getElementById('submitHint');
   var map=null, marker=null, hasPhoto=false, hasLocation=false;
@@ -99,6 +106,22 @@
     hasPhoto=false; checkReady();
   });
 
+  function reverseGeocode(lat,lng){
+    addressField.style.display='block';
+    addressInput.placeholder='Looking up address…';
+    fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat='+lat+'&lon='+lng, {
+      headers:{'Accept-Language':'en'}
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if(data && data.display_name){ addressInput.value = data.display_name; }
+      addressInput.placeholder='Address will appear here once you pin a location';
+    })
+    .catch(function(){
+      addressInput.placeholder='Could not auto-fill address — type it in manually.';
+    });
+  }
+
   function dropPin(lat,lng){
     coordinatesInput.value = lat+','+lng;
     mapDiv.style.display='block';
@@ -110,8 +133,10 @@
       marker=L.marker([lat,lng],{draggable:true}).addTo(map);
       marker.on('dragend', function(){
         var p=marker.getLatLng();
-        coordinatesInput.value = p.lat.toFixed(6)+','+p.lng.toFixed(6);
+        var plat=p.lat.toFixed(6), plng=p.lng.toFixed(6);
+        coordinatesInput.value = plat+','+plng;
         locationStatus.textContent='📍 Location pinned — drag the marker to fine-tune.';
+        reverseGeocode(plat,plng);
       });
     } else {
       map.setView([lat,lng],16);
@@ -119,6 +144,7 @@
     }
     setTimeout(function(){ map.invalidateSize(); }, 200);
     locationStatus.textContent='📍 Location pinned — drag the marker to fine-tune.';
+    reverseGeocode(lat,lng);
     hasLocation=true; checkReady();
   }
 
