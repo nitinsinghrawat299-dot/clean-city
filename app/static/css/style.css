@@ -519,12 +519,12 @@ header.site-header{
 header.site-header.is-scrolled{background:linear-gradient(135deg,#0d3a24 0%, #17552f 55%, #0f4128 100%);}
 header.site-header::before{height:3px;}
 nav.site-nav{padding-top:18px; padding-bottom:18px;}
-.logo span, .logo{color:#eafff0;}
-.logo span{
+header.site-header .logo span, header.site-header .logo{color:#eafff0;}
+header.site-header .logo span{
   background:linear-gradient(90deg,#eafff0,#a6f5bb 50%,#6fd6c9);
   -webkit-background-clip:text; background-clip:text; color:transparent;
 }
-.logo small{color:rgba(234,255,240,.65)!important;}
+header.site-header .logo small{color:rgba(234,255,240,.65)!important;}
 .nav-links a{color:rgba(234,255,240,.82)!important;}
 .nav-links a:hover, .nav-links a.active{color:#fff!important;}
 .nav-actions .btn-ghost{background:rgba(255,255,255,.08); color:#eafff0; border-color:rgba(255,255,255,.25);}
@@ -534,3 +534,14 @@ nav.site-nav{padding-top:18px; padding-bottom:18px;}
 @media (prefers-reduced-motion: reduce){
   header.site-header::before, footer.site-footer::before, .logo-mark, .logo span{animation:none!important;}
 }
+
+/* =========================================================
+   SPR REPORT FORM — photo capture box + pin-location map
+   ========================================================= */
+.photo-capture{
+  width:100%; min-height:220px; border:1.5px dashed var(--border-strong); border-radius:var(--radius-sm);
+  background:var(--bg-panel-2); display:flex; align-items:center; justify-content:center; overflow:hidden;
+}
+.photo-capture img{width:100%; max-height:320px; object-fit:cover; border-radius:var(--radius-sm);}
+.photo-placeholder{display:flex; flex-direction:column; align-items:center; gap:8px; color:var(--text-faint); font-size:.88rem; padding:30px 0;}
+.report-map{width:100%; height:260px; border-radius:var(--radius-sm); overflow:hidden; border:1px solid var(--border); margin-bottom:8px;}
