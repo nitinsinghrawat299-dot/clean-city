@@ -27,7 +27,9 @@
               <span>Tap below to open your camera</span>
             </div>
           </div>
+          <canvas id="stampCanvas" style="display:none;"></canvas>
           <input type="file" name="image" id="imageInput" accept="image/*" capture="environment" required style="display:none;">
+          <p class="field-note" id="stampNote" style="display:none;">📍 GPS location &amp; timestamp will be stamped onto your photo automatically.</p>
           <div style="display:flex; gap:10px; margin-top:10px;">
             <button type="button" class="btn btn-primary btn-sm" id="takePhotoBtn">📷 Open Camera</button>
             <button type="button" class="btn btn-ghost btn-sm" id="retakeBtn" style="display:none;">↺ Retake</button>
@@ -73,6 +75,8 @@
   var retakeBtn=document.getElementById('retakeBtn');
   var photoPreview=document.getElementById('photoPreview');
   var photoPlaceholder=document.getElementById('photoPlaceholder');
+  var stampCanvas=document.getElementById('stampCanvas');
+  var stampNote=document.getElementById('stampNote');
   var pinLocationBtn=document.getElementById('pinLocationBtn');
   var mapDiv=document.getElementById('reportMap');
   var mapError=document.getElementById('mapError');
@@ -80,13 +84,120 @@
   var coordinatesInput=document.getElementById('coordinates');
   var addressField=document.getElementById('addressField');
   var addressInput=document.getElementById('address');
+  var locationInput=document.getElementById('location');
   var submitBtn=document.getElementById('submitBtn');
   var submitHint=document.getElementById('submitHint');
   var map=null, marker=null, hasPhoto=false, hasLocation=false;
+  var rawPhotoFile=null, lastLat=null, lastLng=null, lastAddress='';
 
   function checkReady(){
     if(hasPhoto && hasLocation){ submitBtn.disabled=false; submitHint.style.display='none'; }
     else { submitBtn.disabled=true; submitHint.style.display='block'; }
+  }
+
+  // ---------- GPS STAMP (burns location/address/time onto the photo, like a GPS camera app) ----------
+  function wrapLines(ctx, text, maxWidth){
+    var words=(text||'').split(' '), lines=[], line='';
+    for(var i=0;i<words.length;i++){
+      var test=line ? line+' '+words[i] : words[i];
+      if(ctx.measureText(test).width > maxWidth && line){ lines.push(line); line=words[i]; }
+      else { line=test; }
+    }
+    if(line) lines.push(line);
+    return lines;
+  }
+
+  function stampPhoto(file, callback){
+    var img=new Image();
+    var url=URL.createObjectURL(file);
+    img.onload=function(){
+      var w=img.naturalWidth, h=img.naturalHeight;
+      stampCanvas.width=w; stampCanvas.height=h;
+      var ctx=stampCanvas.getContext('2d');
+      ctx.drawImage(img,0,0,w,h);
+
+      // panel sizing scales with the photo so it looks right on any resolution
+      var pad=Math.max(14, w*0.025);
+      var lineH=Math.max(18, w*0.032);
+      var addrLines=lastAddress ? wrapLinesSetup(ctx, w, lineH) : [];
+      var panelH=Math.max(lineH*3.6, lineH*(2.4+addrLines.length));
+
+      var grad=ctx.createLinearGradient(0,h-panelH,0,h);
+      grad.addColorStop(0,'rgba(10,20,14,0)');
+      grad.addColorStop(0.35,'rgba(8,16,11,0.72)');
+      grad.addColorStop(1,'rgba(6,12,8,0.88)');
+      ctx.fillStyle=grad;
+      ctx.fillRect(0,h-panelH,w,panelH);
+
+      var textX=pad+lineH*0.9, y=h-panelH+lineH*1.15;
+      // location pin marker
+      ctx.font='bold '+(lineH*0.85)+'px Arial';
+      ctx.textAlign='center';
+      ctx.fillText('📍', pad+lineH*0.45, y-lineH*0.08);
+      ctx.textAlign='left';
+
+      ctx.fillStyle='#ffffff';
+      ctx.font='bold '+(lineH*0.95)+'px Arial, sans-serif';
+      var title=(locationInput && locationInput.value.trim()) || 'Pinned Report Location';
+      ctx.fillText(title, textX, y);
+      y+=lineH*1.15;
+
+      ctx.font=(lineH*0.68)+'px Arial, sans-serif';
+      ctx.fillStyle='#d9e7dd';
+      addrLines.forEach(function(line){ ctx.fillText(line, textX, y); y+=lineH*0.82; });
+
+      ctx.fillStyle='#b7c9bd';
+      ctx.font=(lineH*0.62)+'px Arial, sans-serif';
+      if(lastLat!=null && lastLng!=null){
+        ctx.fillText('Lat '+parseFloat(lastLat).toFixed(6)+'°  Long '+parseFloat(lastLng).toFixed(6)+'°', textX, y);
+        y+=lineH*0.8;
+      }
+      var now=new Date();
+      ctx.fillText(now.toLocaleDateString(undefined,{day:'2-digit',month:'short',year:'numeric'})+'  '+now.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'}), textX, y);
+
+      // small "verified" badge, bottom-right
+      var badgeText='SPR VERIFIED';
+      ctx.font='bold '+(lineH*0.5)+'px Arial, sans-serif';
+      var badgeW=ctx.measureText(badgeText).width+lineH*1.1;
+      var badgeH=lineH*0.9;
+      var bx=w-pad-badgeW, by=h-pad-badgeH;
+      ctx.fillStyle='rgba(74,222,128,0.92)';
+      ctx.beginPath();
+      if(ctx.roundRect){ ctx.roundRect(bx,by,badgeW,badgeH,badgeH/2); } else { ctx.rect(bx,by,badgeW,badgeH); }
+      ctx.fill();
+      ctx.fillStyle='#0a140e';
+      ctx.textAlign='center';
+      ctx.fillText(badgeText, bx+badgeW/2, by+badgeH*0.68);
+      ctx.textAlign='left';
+
+      function wrapLinesSetup(ctx, w, lineH){
+        ctx.font=(lineH*0.68)+'px Arial, sans-serif';
+        return wrapLines(ctx, lastAddress, w-pad*2-lineH*1.8).slice(0,2);
+      }
+
+      URL.revokeObjectURL(url);
+      stampCanvas.toBlob(function(blob){
+        if(!blob){ callback(file); return; }
+        var stampedFile=new File([blob], (file.name||'report')+'-stamped.jpg', {type:'image/jpeg'});
+        callback(stampedFile);
+      }, 'image/jpeg', 0.9);
+    };
+    img.onerror=function(){ callback(file); };
+    img.src=url;
+  }
+
+  function applyStamp(file){
+    stampPhoto(file, function(stampedFile){
+      var dt=new DataTransfer();
+      dt.items.add(stampedFile);
+      imageInput.files=dt.files;
+      var previewUrl=URL.createObjectURL(stampedFile);
+      photoPreview.src=previewUrl; photoPreview.style.display='block';
+      photoPlaceholder.style.display='none';
+      takePhotoBtn.style.display='none'; retakeBtn.style.display='inline-flex';
+      stampNote.style.display='block';
+      hasPhoto=true; checkReady();
+    });
   }
 
   takePhotoBtn.addEventListener('click', function(){ imageInput.click(); });
@@ -94,17 +205,15 @@
   imageInput.addEventListener('change', function(){
     var f=this.files[0];
     if(!f) return;
-    var url=URL.createObjectURL(f);
-    photoPreview.src=url; photoPreview.style.display='block';
-    photoPlaceholder.style.display='none';
-    takePhotoBtn.style.display='none'; retakeBtn.style.display='inline-flex';
-    hasPhoto=true; checkReady();
+    rawPhotoFile=f;
+    applyStamp(f);
   });
 
   retakeBtn.addEventListener('click', function(){
-    imageInput.value='';
+    imageInput.value=''; rawPhotoFile=null;
     photoPreview.style.display='none'; photoPlaceholder.style.display='flex';
     takePhotoBtn.style.display='inline-flex'; retakeBtn.style.display='none';
+    stampNote.style.display='none';
     hasPhoto=false; checkReady();
   });
 
@@ -116,8 +225,9 @@
     })
     .then(function(r){ return r.json(); })
     .then(function(data){
-      if(data && data.display_name){ addressInput.value = data.display_name; }
+      if(data && data.display_name){ addressInput.value = data.display_name; lastAddress = data.display_name; }
       addressInput.placeholder='Address will appear here once you pin a location';
+      if(rawPhotoFile) applyStamp(rawPhotoFile);
     })
     .catch(function(){
       addressInput.placeholder='Could not auto-fill address — type it in manually.';
@@ -126,6 +236,7 @@
 
   function dropPin(lat,lng){
     coordinatesInput.value = lat+','+lng;
+    lastLat=lat; lastLng=lng;
     mapDiv.style.display='block';
     mapError.style.display='none';
     if(typeof L === 'undefined'){
@@ -134,6 +245,7 @@
       mapDiv.style.display='none';
       hasLocation=true; checkReady();
       reverseGeocode(lat,lng);
+      if(rawPhotoFile) applyStamp(rawPhotoFile);
       return;
     }
     try{
@@ -147,8 +259,10 @@
           var p=marker.getLatLng();
           var plat=p.lat.toFixed(6), plng=p.lng.toFixed(6);
           coordinatesInput.value = plat+','+plng;
+          lastLat=plat; lastLng=plng;
           locationStatus.textContent='📍 Location pinned — drag the marker to fine-tune.';
           reverseGeocode(plat,plng);
+          if(rawPhotoFile) applyStamp(rawPhotoFile);
         });
       } else {
         map.setView([lat,lng],16);
@@ -163,6 +277,7 @@
     locationStatus.textContent='📍 Location pinned — drag the marker to fine-tune.';
     reverseGeocode(lat,lng);
     hasLocation=true; checkReady();
+    if(rawPhotoFile) applyStamp(rawPhotoFile);
   }
 
   pinLocationBtn.addEventListener('click', function(){
@@ -176,6 +291,10 @@
     }, function(){
       locationStatus.textContent='Could not get your location. Please enable location access and try again.';
     }, {enableHighAccuracy:true, timeout:10000});
+  });
+
+  locationInput.addEventListener('blur', function(){
+    if(rawPhotoFile) applyStamp(rawPhotoFile);
   });
 })();
 </script>
