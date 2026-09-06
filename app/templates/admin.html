@@ -1,132 +1,465 @@
-{% extends "base_admin.html" %}
-{% block title %}Manage Reports — SPR Admin{% endblock %}
+<!DOCTYPE html>
+<html lang="en">
 
-{% block content %}
-{% set resolved_count = complaints | selectattr('status','equalto','Resolved') | list | length %}
-{% set denied_count = complaints | selectattr('status','equalto','Denied') | list | length %}
-{% set pending_count = complaints | length - resolved_count - denied_count %}
+<head>
 
-<div class="admin-topbar">
-  <div>
-    <h1>Manage Reports</h1>
-    <p>View and manage all reported issues.</p>
-  </div>
-  <input type="text" class="search-input" id="reportSearch" placeholder="Search reports…" onkeyup="filterReports()">
-</div>
+    <meta charset="UTF-8">
 
-<div class="admin-stat-grid">
-  <div class="stat-chip"><div class="num">{{ complaints | length }}</div><div class="label">Total Reports</div></div>
-  <div class="stat-chip"><div class="num">{{ resolved_count }}</div><div class="label">Resolved</div></div>
-  <div class="stat-chip"><div class="num">{{ pending_count }}</div><div class="label">Pending</div></div>
-  <div class="stat-chip"><div class="num">{{ denied_count }}</div><div class="label">Denied</div></div>
-</div>
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Municipality Dashboard</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+
+</head>
+
+
+<body>
+
+
+<nav>
+
+    <a href="/" class="nav-logo-link">
+
+        <h2>
+            🏛️ CleanCity Municipality
+        </h2>
+
+    </a>
+
+
+    <div>
+
+        <a href="/dashboard">
+            Citizen Portal
+        </a>
+
+        <a href="/admin/users">
+            👥 Manage Citizens
+        </a>
+
+        <a href="/leaderboard">
+            Leaderboard
+        </a>
+
+        <a href="/logout">
+            Logout
+        </a>
+
+    </div>
+
+</nav>
+
+
+<main>
+
+
+<section class="hero">
+
+    <h1>
+        Municipality Dashboard
+    </h1>
+
+    <p>
+        Verify reports and keep the city clean.
+    </p>
+
+</section>
+
+
+<section class="complaints">
+
 
 {% if complaints %}
-<div style="overflow-x:auto;">
-  <table class="data-table" id="reportsTable">
-    <thead>
-      <tr>
-        <th>#</th>
-        <th>Citizen</th>
-        <th>Issue</th>
-        <th>Location</th>
-        <th>Status</th>
-        <th>Reported</th>
-        <th>Action</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for c in complaints %}
-        <tr>
-          <td>#{{ '%03d' % c.report_number if c.report_number else c.id[:6] }}</td>
-          <td>
-            <a href="{{ url_for('admin_report_detail', complaint_id=c.id) }}" class="citizen-cell" title="Click to review this report">
-              {% if c.image %}
-                <img src="{{ c.image }}" alt="Report photo" class="report-thumb-lg" loading="lazy">
-              {% else %}
-                <div class="report-thumb-lg report-thumb-empty">—</div>
-              {% endif %}
-              <span class="citizen-name">{{ c.citizen_username or c.name or '—' }}</span>
-            </a>
-          </td>
-          <td style="max-width:220px;">
-            {{ c.description[:60] if c.description else '(no description given)' }}{{ '…' if c.description and c.description|length > 60 }}
-          </td>
-          <td>{{ c.location }}</td>
-          <td><span class="status status-{{ c.status | lower | replace(' ', '') }}">{{ c.status }}</span></td>
-          <td>{{ c.created_at.strftime('%d %b %Y') if c.created_at else '—' }}</td>
-          <td>
-            <div class="row-actions">
-              <a href="{{ url_for('admin_report_detail', complaint_id=c.id) }}" class="icon-btn" title="Open &amp; review this report">👁️</a>
-              {% if c.coordinates %}
-                <a href="https://www.google.com/maps?q={{ c.coordinates | urlencode }}" target="_blank" rel="noopener" class="icon-btn" title="Open location in Google Maps">🗺️</a>
-              {% elif c.address or c.location %}
-                <a href="https://www.google.com/maps?q={{ (c.address or c.location) | urlencode }}" target="_blank" rel="noopener" class="icon-btn" title="Open location in Google Maps">🗺️</a>
-              {% endif %}
-              <form method="POST" action="{{ url_for('update_status', complaint_id=c.id) }}" class="status-form" style="display:flex; gap:6px; align-items:center;">
-                <select name="status" class="search-input" style="min-width:120px; padding:6px 10px;" onchange="toggleReason(this)">
-                  <option value="Reported" {{ 'selected' if c.status=='Reported' }}>Reported</option>
-                  <option value="In Progress" {{ 'selected' if c.status=='In Progress' }}>In Progress</option>
-                  <option value="Resolved" {{ 'selected' if c.status=='Resolved' }}>Resolved</option>
-                  <option value="Denied" {{ 'selected' if c.status=='Denied' }}>Denied</option>
-                </select>
-                <input type="text" name="reason" placeholder="Reason (if denying)" class="search-input" style="display:none; min-width:140px; padding:6px 10px;">
-                <button type="submit" class="icon-btn" title="Update status">✔</button>
-              </form>
-              <form method="POST" action="{{ url_for('delete_complaint', complaint_id=c.id) }}" onsubmit="return confirm('Delete this report permanently?');">
-                <button type="submit" class="icon-btn danger" title="Delete report">🗑</button>
-              </form>
-            </div>
-          </td>
-        </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+
+
+<div class="admin-tabs" id="admin-tabs">
+
+    <button type="button" class="admin-tab active" data-tab="All">
+        📋 All Reports
+    </button>
+
+    <button type="button" class="admin-tab" data-tab="Solid Waste & Street Cleaning">
+        🗑️ Solid Waste &amp; Street Cleaning
+    </button>
+
+    <button type="button" class="admin-tab" data-tab="Public Health & Toilet Maintenance">
+        🚻 Public Health &amp; Toilet Maintenance
+    </button>
+
+    <button type="button" class="admin-tab" data-tab="Civil Works & Drainage Infrastructure">
+        🚧 Civil Works &amp; Drainage
+    </button>
+
+    <button type="button" class="admin-tab" data-tab="Emergency & Special Operations">
+        🚨 Emergency &amp; Special Ops
+    </button>
+
 </div>
+
+
+<p class="admin-tab-empty" id="admin-tab-empty" hidden>
+    No reports in this category yet.
+</p>
+
+
+{% for complaint in complaints %}
+
+
+<div
+    class="complaint-card"
+    data-category="{{ complaint['category'] or 'Uncategorized' }}"
+>
+
+
+    <div class="complaint-header">
+
+        <h2>
+            Complaint #{{ complaint["report_number"] or "—" }}
+        </h2>
+
+
+        <span class="status">
+            {{ complaint["status"] }}
+        </span>
+
+    </div>
+
+
+    {% if complaint["image"] %}
+
+    <img
+        src="{{ complaint['image'] }}"
+        class="garbage-image"
+        alt="Garbage Image"
+    >
+
+    {% endif %}
+
+
+    <div class="location-box">
+
+
+        <h3>
+            📍 Location
+        </h3>
+
+
+        <p class="address">
+
+            {{ complaint["address"] or complaint["location"] }}
+
+        </p>
+
+
+        {% if complaint["coordinates"] %}
+
+
+        {% set coords = complaint["coordinates"].split(',') %}
+
+
+        {% if coords|length == 2 %}
+
+        <a
+            href="https://www.google.com/maps?q={{ coords[0] }},{{ coords[1] }}"
+            target="_blank"
+            class="map-button"
+        >
+            🗺️ Open in Google Maps
+        </a>
+
+        {% endif %}
+
+
+        {% endif %}
+
+
+    </div>
+
+
+    <div class="complaint-info">
+
+
+        <p>
+
+            👤
+
+            <strong>
+                Citizen:
+            </strong>
+
+            {{ complaint["citizen_username"] or "Unknown" }}
+
+        </p>
+
+
+        {% if complaint["category"] %}
+
+        <p>
+
+            🗂️
+
+            <strong>
+                Category:
+            </strong>
+
+            {{ complaint["category"] }} → {{ complaint["subcategory"] }}
+
+        </p>
+
+        {% endif %}
+
+
+        <p>
+
+            📝
+
+            <strong>
+                Description:
+            </strong>
+
+
+            {% if complaint["description"] %}
+
+                {{ complaint["description"] }}
+
+            {% else %}
+
+                <span class="no-description">
+                    No description provided.
+                </span>
+
+            {% endif %}
+
+        </p>
+
+
+        {% if complaint["coordinates"] %}
+
+        <p class="coordinates">
+
+            📍 GPS:
+            {{ complaint["coordinates"] }}
+
+        </p>
+
+        {% endif %}
+
+
+        {% if complaint["points_awarded"] > 0 %}
+
+        <p class="earned">
+
+            ⭐ {{ complaint["points_awarded"] }}
+            points already awarded
+
+        </p>
+
+        {% endif %}
+
+
+        {% if complaint["status"] == "Denied" and complaint["denial_reason"] %}
+
+        <p class="denied-reason">
+
+            ⛔ <strong>Denied:</strong>
+            {{ complaint["denial_reason"] }}
+
+        </p>
+
+        {% endif %}
+
+
+    </div>
+
+
+    <form
+        action="/update/{{ complaint['id'] }}"
+        method="POST"
+        class="status-form"
+    >
+
+
+        <label>
+            Status:
+        </label>
+
+
+        <select name="status">
+
+
+            <option
+                value="Reported"
+                {% if complaint["status"] == "Reported" %}
+                selected
+                {% endif %}
+            >
+                🔴 Reported
+            </option>
+
+
+            <option
+                value="In Progress"
+                {% if complaint["status"] == "In Progress" %}
+                selected
+                {% endif %}
+            >
+                🟡 In Progress
+            </option>
+
+
+            <option
+                value="Resolved"
+                {% if complaint["status"] == "Resolved" %}
+                selected
+                {% endif %}
+            >
+                🟢 Resolved
+            </option>
+
+
+            <option
+                value="Denied"
+                {% if complaint["status"] == "Denied" %}
+                selected
+                {% endif %}
+            >
+                ⛔ Denied
+            </option>
+
+
+        </select>
+
+
+        <input
+            type="text"
+            name="reason"
+            placeholder="Reason (only needed if denying)"
+            value="{{ complaint['denial_reason'] or '' }}"
+            class="deny-reason-input"
+        >
+
+
+        <button type="submit">
+            Update Status
+        </button>
+
+
+    </form>
+
+
+    <form
+        action="/delete/{{ complaint['id'] }}"
+        method="POST"
+        class="delete-form"
+        onsubmit="return confirm('Delete report #{{ complaint['report_number'] or complaint['id'] }}? This cannot be undone.');"
+    >
+
+        <button type="submit" class="delete-button">
+            🗑️ Delete Report
+        </button>
+
+    </form>
+
+
+</div>
+
+
+{% endfor %}
+
+
 {% else %}
-<div class="empty-state">
-  <div class="ic">📭</div>
-  <p>No reports yet. New citizen reports will show up here.</p>
+
+
+<div class="empty">
+
+    <h2>
+        🎉 No complaints
+    </h2>
+
+    <p>
+        There are currently no garbage reports.
+    </p>
+
 </div>
+
+
 {% endif %}
 
-<!-- Lightbox for viewing a report's photo full-size -->
-<div class="photo-lightbox" id="photoLightbox" onclick="closeReportPhoto(event)">
-  <div class="photo-lightbox-inner">
-    <button type="button" class="photo-lightbox-close" onclick="closeReportPhoto(event)">✕</button>
-    <img id="photoLightboxImg" src="" alt="Report photo, full size">
-    <div class="photo-lightbox-caption" id="photoLightboxCaption"></div>
-  </div>
-</div>
-{% endblock %}
 
-{% block extra_scripts %}
+</section>
+
+
+</main>
+
+
+<footer>
+
+    CleanCity © 2026
+
+</footer>
+
+
 <script>
-  function toggleReason(select) {
-    const row = select.closest('.status-form');
-    const reasonInput = row.querySelector('input[name="reason"]');
-    reasonInput.style.display = select.value === 'Denied' ? 'block' : 'none';
-    reasonInput.required = select.value === 'Denied';
-  }
 
-  function filterReports() {
-    const q = document.getElementById('reportSearch').value.toLowerCase();
-    document.querySelectorAll('#reportsTable tbody tr').forEach(row => {
-      row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+    document.addEventListener("DOMContentLoaded", function () {
+
+        const tabsContainer = document.getElementById("admin-tabs");
+
+        if (!tabsContainer) {
+            return;
+        }
+
+        const tabs = tabsContainer.querySelectorAll(".admin-tab");
+        const cards = document.querySelectorAll(".complaint-card");
+        const emptyMessage = document.getElementById("admin-tab-empty");
+
+        function applyFilter(selectedTab) {
+
+            let visibleCount = 0;
+
+            cards.forEach(function (card) {
+
+                const matches = (
+                    selectedTab === "All" ||
+                    card.dataset.category === selectedTab
+                );
+
+                card.style.display = matches ? "" : "none";
+
+                if (matches) {
+                    visibleCount += 1;
+                }
+            });
+
+            emptyMessage.hidden = visibleCount > 0;
+        }
+
+        tabs.forEach(function (tab) {
+
+            tab.addEventListener("click", function () {
+
+                tabs.forEach(function (t) {
+                    t.classList.remove("active");
+                });
+
+                tab.classList.add("active");
+
+                applyFilter(tab.dataset.tab);
+            });
+        });
+
     });
-  }
 
-  function openReportPhoto(url, location) {
-    document.getElementById('photoLightboxImg').src = url;
-    document.getElementById('photoLightboxCaption').textContent = location || '';
-    document.getElementById('photoLightbox').classList.add('open');
-  }
-
-  function closeReportPhoto(e) {
-    if (e.target.id === 'photoLightbox' || e.target.classList.contains('photo-lightbox-close')) {
-      document.getElementById('photoLightbox').classList.remove('open');
-      document.getElementById('photoLightboxImg').src = '';
-    }
-  }
 </script>
-{% endblock %}
+
+
+</body>
+
+</html>

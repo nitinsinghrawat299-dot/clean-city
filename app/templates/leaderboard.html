@@ -1,45 +1,149 @@
-{% extends "base.html" %}
-{% block title %}Leaderboard — SPR{% endblock %}
+<!DOCTYPE html>
+<html lang="en">
 
-{% block content %}
-<section style="padding:44px 0;">
-  <div class="wrap">
-    <div class="dash-header">
-      <h1>🏆 Leaderboard</h1>
-      <p>Top contributors making {{ "our" }} city cleaner.</p>
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>CleanCity Leaderboard</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+
+</head>
+
+
+<body>
+
+
+<nav>
+
+    <a href="/" class="nav-logo-link"><h2>🌱 CleanCity</h2></a>
+
+    <div>
+
+        <a href="/dashboard">
+            Report
+        </a>
+
+        <a href="/profile">
+            My Impact
+        </a>
+
+        <a href="/citizen-logout">
+            Logout
+        </a>
+
     </div>
 
-    <div class="card" style="padding:8px 8px 20px;">
-      <div style="overflow-x:auto;">
-        <table class="lb-table">
-          <thead>
-            <tr>
-              <th>Rank</th>
-              <th>User</th>
-              <th>Badge</th>
-              <th>Points</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for u in users %}
-              <tr class="{{ 'me' if session.get('citizen_username') == u.username }}">
-                <td class="lb-rank {{ 'top' if u.rank <= 3 }}">#{{ u.rank }}</td>
-                <td>
-                  <div class="lb-user">
-                    <span class="lb-avatar">{{ u.username[:1] | upper }}</span>
-                    <span>{{ u.username }}{% if session.get('citizen_username') == u.username %} (you){% endif %}</span>
-                  </div>
-                </td>
-                <td>{{ u.icon }} {{ u.badge }}</td>
-                <td><strong>{{ u.points }}</strong> pts</td>
-              </tr>
+</nav>
+
+
+<main>
+
+
+<section class="leaderboard">
+
+
+    <h1>
+        🏆 CleanCity Heroes
+    </h1>
+
+
+    <p>
+        Citizens with the most resolved reports.
+    </p>
+
+
+    {% for user in users %}
+
+
+    <div
+        class="
+            leaderboard-row
+            {% if user['username'] == session.get('citizen_username') %}
+            current-user
+            {% endif %}
+        "
+    >
+
+
+        <div class="rank">
+
+            {% if user["rank"] == 1 %}
+
+                🥇
+
+            {% elif user["rank"] == 2 %}
+
+                🥈
+
+            {% elif user["rank"] == 3 %}
+
+                🥉
+
             {% else %}
-              <tr><td colspan="4" class="empty-state">No citizens on the leaderboard yet — be the first to report an issue!</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
+
+                #{{ user["rank"] }}
+
+            {% endif %}
+
+        </div>
+
+
+        <div class="leader-name">
+
+            <strong>
+                {{ user["icon"] }}
+                {{ user["username"] }}
+            </strong>
+
+
+            <small>
+                {{ user["badge"] }}
+            </small>
+
+        </div>
+
+
+        <div class="leader-points">
+
+            ⭐ {{ user["points"] }}
+
+        </div>
+
+
     </div>
-  </div>
+
+
+    {% else %}
+
+
+    <div class="empty">
+
+        <h2>
+            🌱 No citizens yet
+        </h2>
+
+    </div>
+
+
+    {% endfor %}
+
+
 </section>
-{% endblock %}
+
+
+</main>
+
+
+</body>
+
+</html>

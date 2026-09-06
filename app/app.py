@@ -9,13 +9,13 @@ from flask import (
 )
 
 import os
+import re
 import uuid
 import requests
 import datetime
 import secrets
 import smtplib
 import ssl
-import threading
 from email.mime.text import MIMEText
 
 from dotenv import load_dotenv
@@ -24,9 +24,9 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 import urllib.parse
-import firebase_admin
-from firebase_admin import credentials, firestore
+from google.cloud import firestore
 from google.cloud.firestore_v1 import Increment
+from google.oauth2 import service_account
 import cloudinary
 import cloudinary.uploader
 
@@ -100,7 +100,11 @@ def is_reserved_username(username):
 
 
 # -----------------------------------------------------------
-# FIREBASE — Firestore (database)
+# FIRESTORE (database) — connects directly via google-cloud-firestore
+# rather than through the firebase_admin wrapper. This sidesteps a
+# class of "Invalid database id (default)" errors some deployments hit
+# with the firebase_admin abstraction layer, especially under Gunicorn
+# with multiple workers.
 # -----------------------------------------------------------
 #
 # Locally: set GOOGLE_APPLICATION_CREDENTIALS in your .env to the path
@@ -113,13 +117,17 @@ def is_reserved_username(username):
 cred_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
 
 if cred_path:
-    cred = credentials.Certificate(cred_path)
-    firebase_admin.initialize_app(cred)
+    gcp_credentials = service_account.Credentials.from_service_account_file(
+        cred_path
+    )
+    db = firestore.Client(
+        credentials=gcp_credentials,
+        project=gcp_credentials.project_id,
+        database="(default)"
+    )
 else:
     # Cloud Run / any environment with Application Default Credentials
-    firebase_admin.initialize_app()
-
-db = firestore.client()
+    db = firestore.Client(database="(default)")
 
 
 # -----------------------------------------------------------
@@ -169,6 +177,70 @@ EMAIL_FROM = os.environ.get("EMAIL_FROM", SMTP_USERNAME)
 
 RESET_TOKEN_LIFETIME_MINUTES = 60
 
+# -----------------------------------------------------------
+# REGISTRATION OTP — real SMS to Indian mobile numbers via
+# Fast2SMS's dedicated OTP route. This route uses Fast2SMS's own
+# pre-approved DLT template ("Your OTP: {#var#}"), so it works
+# without needing your own DLT registration — the usual blocker
+# for sending transactional SMS in India.
+# Get a free API key at https://www.fast2sms.com (Dev API section).
+# -----------------------------------------------------------
+
+OTP_LIFETIME_SECONDS = 120
+
+OTP_VERIFY_TOKEN_LIFETIME_MINUTES = 10
+
+FAST2SMS_API_KEY = os.environ.get("FAST2SMS_API_KEY")
+
+INDIAN_MOBILE_REGEX = re.compile(r"^[6-9]\d{9}$")
+
+
+def generate_otp_code():
+    return f"{secrets.randbelow(1_000_000):06d}"
+
+
+def send_sms_otp(phone, otp_code):
+    """
+    Sends a real SMS OTP to an Indian mobile number via Fast2SMS's
+    OTP route. Returns True on success.
+
+    Fails open with a console log (not an exception) if the API key
+    isn't set or the request fails, mirroring send_email()'s
+    behavior — a missing key shouldn't crash registration outright,
+    though in practice no code will reach the phone until it's set.
+    """
+
+    if not FAST2SMS_API_KEY:
+        print("[sms] Skipped — FAST2SMS_API_KEY not set.")
+        return False
+
+    try:
+        response = requests.get(
+            "https://www.fast2sms.com/dev/bulkV2",
+            params={
+                "authorization": FAST2SMS_API_KEY,
+                "route": "otp",
+                "variables_values": otp_code,
+                "numbers": phone
+            },
+            timeout=10
+        )
+
+        response.raise_for_status()
+
+        result = response.json()
+
+        success = bool(result.get("return"))
+
+        if not success:
+            print(f"[sms] Fast2SMS reported failure: {result}")
+
+        return success
+
+    except Exception as error:
+        print(f"[sms] ERROR sending OTP: {error}")
+        return False
+
 
 def send_email(to_email, subject, body_text):
     """
@@ -200,27 +272,13 @@ def send_email(to_email, subject, body_text):
 
         context = ssl.create_default_context()
 
-        # Port 465 = implicit SSL from the start (no STARTTLS step).
-        # Port 587 (the common default) = plain connection, then
-        # upgrade to TLS with STARTTLS. Using the wrong one for your
-        # provider's port is a common reason emails silently fail.
-        if SMTP_PORT == 465:
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
 
-            with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, context=context, timeout=10) as server:
+            server.starttls(context=context)
 
-                server.login(SMTP_USERNAME, SMTP_PASSWORD)
+            server.login(SMTP_USERNAME, SMTP_PASSWORD)
 
-                server.sendmail(EMAIL_FROM, [to_email], message.as_string())
-
-        else:
-
-            with smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=10) as server:
-
-                server.starttls(context=context)
-
-                server.login(SMTP_USERNAME, SMTP_PASSWORD)
-
-                server.sendmail(EMAIL_FROM, [to_email], message.as_string())
+            server.sendmail(EMAIL_FROM, [to_email], message.as_string())
 
         return True
 
@@ -257,107 +315,6 @@ cloudinary.config(
     api_secret=_parsed_cloudinary_url.password,
     secure=True
 )
-
-
-# -----------------------------------------------------------
-# GARBAGE IMAGE CHECK — uses Roboflow's free garbage-detection
-# model so citizens can't upload random / unrelated photos.
-# -----------------------------------------------------------
-
-ROBOFLOW_API_KEY = os.environ.get("ROBOFLOW_API_KEY")
-
-ROBOFLOW_MODEL_ID = os.environ.get(
-    "ROBOFLOW_MODEL_ID",
-    "garbage_detection-wvzwv/9"
-)
-
-GARBAGE_CONFIDENCE_THRESHOLD = 0.50
-
-
-# -----------------------------------------------------------
-# COMPLIANCE CATEGORY MAP — the 16 national Swachhata-MoHUA
-# sub-categories grouped into 4 operational departments.
-# Server-side whitelist: never trust department/subcategory
-# values from the client without checking them against this.
-# -----------------------------------------------------------
-
-DEPARTMENT_CATEGORIES = {
-    "Solid Waste & Street Cleaning": [
-        "Garbage Dump",
-        "Dustbins Not Cleaned",
-        "Sweeping Not Done",
-        "Garbage Vehicle Not Arrived",
-        "Burning of Garbage",
-        "Dirty Spot",
-    ],
-    "Public Health & Toilet Maintenance": [
-        "Uncleaning Public Toilet",
-        "Blockage",
-        "No Water Supply",
-        "No Electricity",
-    ],
-    "Civil Works & Drainage": [
-        "Open Manholes/Drains",
-        "Sewerage Overflow",
-        "Septic Tank Overflow",
-        "Stagnant Water",
-    ],
-    "Emergency & Special Operations": [
-        "Debris Removal",
-        "Dead Animal Removal",
-        "Yellow Spot",
-        "Open Defecation",
-        "Unsafe Manhole Entry",
-    ],
-}
-
-# Departments whose photos are checked by the Roboflow garbage-detection
-# model. Other departments skip this check since there's no matching
-# vision model for them yet (e.g. manholes, dead animals, toilets).
-AI_CHECKED_DEPARTMENTS = {"Solid Waste & Street Cleaning"}
-
-# Pauri Nagar Palika has 11 wards.
-WARD_NUMBERS = list(range(1, 12))
-
-
-def contains_garbage(image_bytes):
-    """
-    Sends the uploaded image bytes to the Roboflow garbage-detection API.
-
-    Returns True if garbage/litter is detected with confidence above
-    the threshold, False otherwise. Fails open (returns True) if the
-    API key isn't set or the call fails, so a temporary outage never
-    blocks citizens from submitting real reports.
-    """
-
-    if not ROBOFLOW_API_KEY:
-        return True
-
-    try:
-        response = requests.post(
-            f"https://detect.roboflow.com/{ROBOFLOW_MODEL_ID}",
-            params={
-                "api_key": ROBOFLOW_API_KEY,
-                "confidence": int(GARBAGE_CONFIDENCE_THRESHOLD * 100),
-            },
-            files={"file": image_bytes},
-            timeout=10,
-        )
-
-        response.raise_for_status()
-
-        result = response.json()
-
-        predictions = result.get("predictions", [])
-
-        for prediction in predictions:
-            if prediction.get("confidence", 0) >= GARBAGE_CONFIDENCE_THRESHOLD:
-                return True
-
-        return False
-
-    except Exception:
-        return True
 
 
 # -----------------------------------------------------------
@@ -421,54 +378,162 @@ def get_badge(points):
 
 
 # =========================================================
-# HOME
+# PUBLIC LANDING PAGE — showcases Pauri to visitors, no login
+# required. This is the very first thing anyone sees.
 # =========================================================
 
 @app.route("/")
-def home():
+def landing():
 
-    if session.get("citizen_id"):
-
-        return render_template(
-            "index.html",
-            department_categories=DEPARTMENT_CATEGORIES,
-            ward_numbers=WARD_NUMBERS
-        )
-
-    # Not logged in -> public landing page (visitors haven't signed up
-    # yet), instead of bouncing them straight to the login form.
-    #
-    # reports_count reuses the same counter document that assigns
-    # report numbers, so it's a single cheap doc read rather than
-    # streaming the whole "complaints" collection.
-
-    counter_snapshot = _report_counter_ref.get()
-
-    reports_count = counter_snapshot.get("value") if counter_snapshot.exists else 0
-
-    user_docs = list(db.collection("users").stream())
-
-    users_count = len(user_docs)
-
-    points_total = sum(doc.to_dict().get("points", 0) for doc in user_docs)
-
-    # "Clean Areas" on the landing page = reports that reached Resolved.
-    resolved_count = len(list(
-        db.collection("complaints").where("status", "==", "Resolved").stream()
-    ))
-
-    stats = {
-        "reports": f"{reports_count:,}",
-        "users": f"{users_count:,}",
-        "points": f"{points_total:,}",
-        "areas": f"{resolved_count:,}",
-    }
-
-    return render_template("landing.html", stats=stats)
+    return render_template("landing.html")
 
 
 # =========================================================
-# CITIZEN REGISTER
+# CITIZEN DASHBOARD (report submission) — was the old "/"
+# =========================================================
+
+@app.route("/dashboard")
+def dashboard():
+
+    if not session.get("citizen_id"):
+
+        return redirect(url_for("citizen_login"))
+
+    citizen_id = session["citizen_id"]
+
+    user_doc = db.collection("users").document(citizen_id).get()
+
+    active_warning = None
+
+    if user_doc.exists:
+
+        user = user_doc.to_dict()
+
+        if user.get("warning_message") and not user.get(
+            "warning_acknowledged", True
+        ):
+
+            active_warning = user["warning_message"]
+
+    return render_template("index.html", active_warning=active_warning)
+
+
+# =========================================================
+# REGISTRATION — STEP 1: SEND SMS OTP
+# =========================================================
+
+@app.route("/api/send-otp", methods=["POST"])
+def send_otp():
+
+    data = request.get_json(silent=True) or request.form
+
+    phone = (data.get("phone") or "").strip()
+
+    if not INDIAN_MOBILE_REGEX.match(phone):
+
+        return {
+            "success": False,
+            "message": "Enter a valid 10-digit Indian mobile number."
+        }, 400
+
+    existing_phone = list(
+        db.collection("users").where("phone", "==", phone).limit(1).stream()
+    )
+
+    if existing_phone:
+
+        return {
+            "success": False,
+            "message": "An account with that mobile number already exists."
+        }, 400
+
+    otp_code = generate_otp_code()
+
+    expires_at = (
+        datetime.datetime.utcnow()
+        + datetime.timedelta(seconds=OTP_LIFETIME_SECONDS)
+    )
+
+    db.collection("otp_verifications").document(phone).set({
+        "otp_hash": generate_password_hash(otp_code),
+        "expires_at": expires_at.isoformat(),
+        "verified": False,
+        "verify_token": None,
+        "verify_token_expires": None
+    })
+
+    sent = send_sms_otp(phone, otp_code)
+
+    if not sent:
+
+        return {
+            "success": False,
+            "message": (
+                "Couldn't send the SMS right now. Please try again "
+                "shortly."
+            )
+        }, 502
+
+    return {"success": True, "message": "Code sent — check your SMS inbox."}
+
+
+# =========================================================
+# REGISTRATION — STEP 2: VERIFY SMS OTP
+# =========================================================
+
+@app.route("/api/verify-otp", methods=["POST"])
+def verify_otp():
+
+    data = request.get_json(silent=True) or request.form
+
+    phone = (data.get("phone") or "").strip()
+
+    submitted_code = (data.get("otp") or "").strip()
+
+    otp_ref = db.collection("otp_verifications").document(phone)
+
+    otp_doc = otp_ref.get()
+
+    if not otp_doc.exists:
+
+        return {
+            "success": False,
+            "message": "No code was sent to that number. Request a new one."
+        }, 400
+
+    otp_data = otp_doc.to_dict()
+
+    expires_at = datetime.datetime.fromisoformat(otp_data["expires_at"])
+
+    if datetime.datetime.utcnow() > expires_at:
+
+        return {
+            "success": False,
+            "message": "That code has expired. Request a new one."
+        }, 400
+
+    if not check_password_hash(otp_data["otp_hash"], submitted_code):
+
+        return {"success": False, "message": "Incorrect code."}, 400
+
+    verify_token = secrets.token_urlsafe(24)
+
+    verify_token_expires = (
+        datetime.datetime.utcnow()
+        + datetime.timedelta(minutes=OTP_VERIFY_TOKEN_LIFETIME_MINUTES)
+    )
+
+    otp_ref.update({
+        "verified": True,
+        "verify_token": verify_token,
+        "verify_token_expires": verify_token_expires.isoformat()
+    })
+
+    return {"success": True, "verify_token": verify_token}
+
+
+# =========================================================
+# CITIZEN REGISTER — STEP 3: PROFILE SETUP (finalizes account)
 # =========================================================
 
 @app.route("/register", methods=["GET", "POST"])
@@ -484,33 +549,70 @@ def register():
 
         confirm_password = request.form.get("confirm_password", "")
 
+        phone = request.form.get("phone", "").strip()
+
         if len(username) < 3:
 
-            flash("Username must be at least 3 characters.", "error")
+            flash("Username must be at least 3 characters.")
 
             return redirect(url_for("register"))
 
         if is_reserved_username(username):
 
-            flash("That username is reserved. Please choose another one.", "error")
+            flash("That username is reserved. Please choose another one.")
 
             return redirect(url_for("register"))
 
         if "@" not in email or "." not in email.split("@")[-1]:
 
-            flash("Please enter a valid email address.", "error")
+            flash("Please enter a valid email address.")
+
+            return redirect(url_for("register"))
+
+        if not INDIAN_MOBILE_REGEX.match(phone):
+
+            flash("Please enter a valid 10-digit Indian mobile number.")
+
+            return redirect(url_for("register"))
+
+        verify_token = request.form.get("verify_token", "").strip()
+
+        otp_doc = db.collection("otp_verifications").document(phone).get()
+
+        otp_data = otp_doc.to_dict() if otp_doc.exists else {}
+
+        token_ok = (
+            otp_data.get("verified")
+            and verify_token
+            and verify_token == otp_data.get("verify_token")
+        )
+
+        if token_ok:
+
+            token_expires = datetime.datetime.fromisoformat(
+                otp_data["verify_token_expires"]
+            )
+
+            token_ok = datetime.datetime.utcnow() <= token_expires
+
+        if not token_ok:
+
+            flash(
+                "Please verify your mobile number with the code we "
+                "texted you before finishing registration."
+            )
 
             return redirect(url_for("register"))
 
         if len(password) < 4:
 
-            flash("Password must be at least 4 characters.", "error")
+            flash("Password must be at least 4 characters.")
 
             return redirect(url_for("register"))
 
         if password != confirm_password:
 
-            flash("Passwords do not match.", "error")
+            flash("Passwords do not match.")
 
             return redirect(url_for("register"))
 
@@ -522,7 +624,7 @@ def register():
 
         if existing_username:
 
-            flash("That username already exists.", "error")
+            flash("That username already exists.")
 
             return redirect(url_for("register"))
 
@@ -532,7 +634,17 @@ def register():
 
         if existing_email:
 
-            flash("An account with that email already exists.", "error")
+            flash("An account with that email already exists.")
+
+            return redirect(url_for("register"))
+
+        existing_phone = list(
+            users_ref.where("phone", "==", phone).limit(1).stream()
+        )
+
+        if existing_phone:
+
+            flash("An account with that mobile number already exists.")
 
             return redirect(url_for("register"))
 
@@ -541,15 +653,20 @@ def register():
         users_ref.add({
             "username": username,
             "email": email,
+            "phone": phone,
             "password": hashed_password,
             "points": 0,
-            "photo_url": None,
             "reset_token": None,
             "reset_token_expires": None,
+            "warning_message": None,
+            "warning_issued_at": None,
+            "warning_acknowledged": True,
             "created_at": firestore.SERVER_TIMESTAMP
         })
 
-        flash("Account created! Just hit login below.", "success")
+        flash("Account created! Just hit login below.")
+
+        db.collection("otp_verifications").document(phone).delete()
 
         # Carry the just-entered credentials over to the login page so
         # the user only has to press "Login" — nothing to retype. This
@@ -596,11 +713,9 @@ def citizen_login():
 
             session["citizen_username"] = user_doc.to_dict()["username"]
 
-            session["citizen_photo_url"] = user_doc.to_dict().get("photo_url")
+            return redirect(url_for("dashboard"))
 
-            return redirect(url_for("home"))
-
-        flash("Incorrect username or password.", "error")
+        flash("Incorrect username or password.")
 
     # Pop (not just read) any prefill values left by a fresh registration
     # so they're only ever used once, right after signing up.
@@ -625,8 +740,6 @@ def citizen_logout():
     session.pop("citizen_id", None)
 
     session.pop("citizen_username", None)
-
-    session.pop("citizen_photo_url", None)
 
     return redirect(url_for("citizen_login"))
 
@@ -670,109 +783,151 @@ def forgot_password():
                 _external=True
             )
 
-            # Sending the email happens in a background thread so this
-            # request returns immediately. Without this, a slow or
-            # unreachable SMTP server (very common on free hosting,
-            # which often blocks outbound SMTP ports) makes the whole
-            # request hang, which is what caused the "reloading and
-            # reloading" behaviour on Forgot Password.
-            email_thread = threading.Thread(
-                target=send_email,
-                kwargs=dict(
-                    to_email=email,
-                    subject="Reset your CleanCity password",
-                    body_text=(
-                        "We received a request to reset your CleanCity "
-                        "password.\n\n"
-                        f"Click this link to choose a new password:\n{reset_link}\n\n"
-                        f"This link expires in {RESET_TOKEN_LIFETIME_MINUTES} "
-                        "minutes.\n\n"
-                        "If you didn't request this, you can safely ignore "
-                        "this email — your password will stay the same."
-                    )
-                ),
-                daemon=True
+            send_email(
+                to_email=email,
+                subject="Reset your CleanCity password",
+                body_text=(
+                    "We received a request to reset your CleanCity "
+                    "password.\n\n"
+                    f"Click this link to choose a new password:\n{reset_link}\n\n"
+                    f"This link expires in {RESET_TOKEN_LIFETIME_MINUTES} "
+                    "minutes.\n\n"
+                    "If you didn't request this, you can safely ignore "
+                    "this email — your password will stay the same."
+                )
             )
-            email_thread.start()
+
         # Same message whether or not the email was found, so we don't
         # reveal which emails have accounts registered.
         flash(
             "If that email is registered, we've sent a password reset "
-            "link. Check your inbox (and spam folder).",
-            "info"
+            "link. Check your inbox (and spam folder)."
         )
+
         return redirect(url_for("citizen_login"))
+
     return render_template("forgot_password.html")
+
+
 # =========================================================
 # RESET PASSWORD — via the emailed token link
 # =========================================================
+
 @app.route("/reset-password/<token>", methods=["GET", "POST"])
 def reset_password(token):
+
     users_ref = db.collection("users")
+
     matches = list(
         users_ref.where("reset_token", "==", token).limit(1).stream()
     )
+
     user_doc = matches[0] if matches else None
+
     token_valid = False
+
     if user_doc:
+
         expires_raw = user_doc.to_dict().get("reset_token_expires")
+
         if expires_raw:
+
             expires_at = datetime.datetime.fromisoformat(expires_raw)
+
             if datetime.datetime.utcnow() <= expires_at:
+
                 token_valid = True
+
     if not token_valid:
+
         flash(
             "That reset link is invalid or has expired. Please request "
-            "a new one.",
-            "error"
+            "a new one."
         )
+
         return redirect(url_for("forgot_password"))
+
     if request.method == "POST":
+
         password = request.form.get("password", "")
+
         confirm_password = request.form.get("confirm_password", "")
+
         if len(password) < 4:
-            flash("Password must be at least 4 characters.", "error")
+
+            flash("Password must be at least 4 characters.")
+
             return redirect(url_for("reset_password", token=token))
+
         if password != confirm_password:
-            flash("Passwords do not match.", "error")
+
+            flash("Passwords do not match.")
+
             return redirect(url_for("reset_password", token=token))
+
         user_doc.reference.update({
             "password": generate_password_hash(password),
             "reset_token": None,
             "reset_token_expires": None
         })
-        flash("Your password has been reset. You can log in now.", "success")
+
+        flash("Your password has been reset. You can log in now.")
+
         return redirect(url_for("citizen_login"))
+
     return render_template("reset_password.html", token=token)
+
+
 # =========================================================
 # CITIZEN PROFILE
 # =========================================================
+
 @app.route("/profile")
 def profile():
+
     if not session.get("citizen_id"):
+
         return redirect(url_for("citizen_login"))
+
     citizen_id = session["citizen_id"]
+
     user_doc = db.collection("users").document(citizen_id).get()
+
     if not user_doc.exists:
+
         session.pop("citizen_id", None)
+
         return redirect(url_for("citizen_login"))
+
     user = user_doc.to_dict()
+
     complaint_docs = list(
         db.collection("complaints")
         .where("citizen_id", "==", citizen_id)
         .order_by("created_at", direction=firestore.Query.DESCENDING)
         .stream()
     )
+
     complaints = []
+
     resolved = 0
+
     for doc in complaint_docs:
+
         data = doc.to_dict()
+
         data["id"] = doc.id
+
         complaints.append(data)
+
         if data.get("status") == "Resolved":
+
             resolved += 1
+
     total = len(complaints)
+
     badge_icon, badge_name = get_badge(user.get("points", 0))
+
     return render_template(
         "profile.html",
         user=user,
@@ -782,84 +937,77 @@ def profile():
         badge_icon=badge_icon,
         badge_name=badge_name
     )
+
+
 # =========================================================
-# UPDATE PROFILE PICTURE (citizen)
-# =========================================================
-
-@app.route("/update-pfp", methods=["POST"])
-def update_pfp():
-
-    if not session.get("citizen_id"):
-
-        return redirect(url_for("citizen_login"))
-
-    citizen_id = session["citizen_id"]
-
-    image = request.files.get("pfp")
-
-    if not image or not image.filename:
-
-        flash("Please choose a photo to upload.", "error")
-
-        return redirect(url_for("profile"))
-    if not allowed_image(image.filename):
-        flash(
-            "Please upload an image file (png, jpg, jpeg, gif, or webp).",
-            "error"
-        )
-        return redirect(url_for("profile"))
-    original_name = secure_filename(image.filename)
-    extension = original_name.rsplit(".", 1)[1].lower()
-    # Profile pictures don't go through the garbage-detection check —
-    # that's only for complaint photos.
-    photo_url = upload_image_to_storage(image, extension)
-    db.collection("users").document(citizen_id).update({
-        "photo_url": photo_url
-    })
-    session["citizen_photo_url"] = photo_url
-    flash("Profile picture updated! 🌱", "success")
-    return redirect(url_for("profile"))
-    # =========================================================
 # DELETE MY ACCOUNT (citizen)
 # =========================================================
+
 @app.route("/delete-account", methods=["POST"])
 def delete_account():
+
     if not session.get("citizen_id"):
+
         return redirect(url_for("citizen_login"))
+
     citizen_id = session["citizen_id"]
+
     password = request.form.get("password", "")
+
     user_doc = db.collection("users").document(citizen_id).get()
+
     if not user_doc.exists:
+
         session.pop("citizen_id", None)
+
         session.pop("citizen_username", None)
+
         return redirect(url_for("citizen_login"))
+
     user = user_doc.to_dict()
+
     # Require the password again as a safety check before permanently
     # deleting the account — a confirm dialog alone is easy to click
     # through by accident.
     if not check_password_hash(user.get("password", ""), password):
-        flash("Incorrect password. Your account was NOT deleted.", "error")
+
+        flash("Incorrect password. Your account was NOT deleted.")
+
         return redirect(url_for("profile"))
+
     db.collection("users").document(citizen_id).delete()
+
     session.pop("citizen_id", None)
+
     session.pop("citizen_username", None)
-    flash("Your account has been deleted. We're sad to see you go! 🌱", "success")
+
+    flash("Your account has been deleted. We're sad to see you go! 🌱")
+
     return redirect(url_for("citizen_login"))
+
+
 # =========================================================
 # LEADERBOARD
 # =========================================================
+
 @app.route("/leaderboard")
 def leaderboard():
+
     users_docs = (
         db.collection("users")
         .order_by("points", direction=firestore.Query.DESCENDING)
         .limit(20)
         .stream()
     )
+
     leaderboard_data = []
+
     for index, doc in enumerate(users_docs, start=1):
+
         user = doc.to_dict()
+
         icon, badge = get_badge(user.get("points", 0))
+
         leaderboard_data.append({
             "rank": index,
             "username": user.get("username"),
@@ -867,86 +1015,69 @@ def leaderboard():
             "icon": icon,
             "badge": badge
         })
+
     return render_template(
         "leaderboard.html",
         users=leaderboard_data
     )
-# =========================================================
-# ABOUT PAURI GARHWAL — informational page
-# =========================================================
-@app.route("/pauri-garhwal")
-def pauri_garhwal():
-    return render_template("paurigarhwal.html")
+
+
 # =========================================================
 # SUBMIT COMPLAINT
 # =========================================================
+
 @app.route("/submit", methods=["POST"])
 def submit():
-    if not session.get("citizen_id"):
-        return redirect(url_for("citizen_login"))
-    citizen_id = session["citizen_id"]
-    username = session.get("citizen_username", "Citizen")
-    description = request.form.get("description", "").strip()
-    location = request.form.get("location", "").strip()
-    coordinates = request.form.get("coordinates", "").strip()
-    address = request.form.get("address", "").strip()
-    department = request.form.get("department", "").strip()
-    subcategory = request.form.get("subcategory", "").strip()
-    ward_number_raw = request.form.get("ward_number", "").strip()
-    if len(description) > 1000:
-        flash("Description is too long (max 1000 characters).", "error")
-        return redirect(url_for("home"))
-    # Validate department/subcategory against the server-side whitelist —
-    # never trust these values as sent, since the client could tamper
-    # with the <select> options.
-    if department not in DEPARTMENT_CATEGORIES:
-        flash("Please choose a valid issue department.", "error")
-        return redirect(url_for("home"))
-    if subcategory not in DEPARTMENT_CATEGORIES[department]:
-        flash("Please choose a valid issue type for that department.", "error")
-        return redirect(url_for("home"))
-    try:
-        ward_number = int(ward_number_raw)
-        if ward_number not in WARD_NUMBERS:
-            raise ValueError
-    except ValueError:
-        flash("Please choose a valid ward number.", "error")
-        return redirect(url_for("home"))
-    image = request.files.get("image")
-    if not image or not image.filename:
-        flash("Please upload a garbage photo.", "error")
 
-        return redirect(url_for("home"))
+    if not session.get("citizen_id"):
+
+        return redirect(url_for("citizen_login"))
+
+    citizen_id = session["citizen_id"]
+
+    username = session.get("citizen_username", "Citizen")
+
+    description = request.form.get("description", "").strip()
+
+    category = request.form.get("category", "").strip()
+
+    subcategory = request.form.get("subcategory", "").strip()
+
+    location = request.form.get("location", "").strip()
+
+    coordinates = request.form.get("coordinates", "").strip()
+
+    address = request.form.get("address", "").strip()
+
+    if len(description) > 1000:
+
+        flash("Description is too long (max 1000 characters).")
+
+        return redirect(url_for("dashboard"))
+
+    if not category or not subcategory:
+
+        flash("Please select the type of issue before submitting.")
+
+        return redirect(url_for("dashboard"))
+
+    image = request.files.get("image")
+
+    if not image or not image.filename:
+
+        flash("Please upload a garbage photo.")
+
+        return redirect(url_for("dashboard"))
 
     if not allowed_image(image.filename):
 
-        flash("Please upload an image file (png, jpg, jpeg, gif, or webp).", "error")
+        flash("Please upload an image file (png, jpg, jpeg, gif, or webp).")
 
-        return redirect(url_for("home"))
+        return redirect(url_for("dashboard"))
 
     original_name = secure_filename(image.filename)
 
     extension = original_name.rsplit(".", 1)[1].lower()
-
-    image_bytes = image.read()
-
-    # Only run the AI garbage-detection check for the department it was
-    # actually trained for. Other departments (manholes, toilets, dead
-    # animals, etc.) don't have a matching vision model yet, so their
-    # photos pass through on the citizen's word for now.
-    if department in AI_CHECKED_DEPARTMENTS and not contains_garbage(image_bytes):
-
-        flash(
-            "We couldn't spot any garbage/litter in that photo. "
-            "Please upload a clear photo of the actual garbage.",
-            "error"
-        )
-
-        return redirect(url_for("home"))
-
-    # Reset stream position, then upload (contains_garbage already
-    # consumed the bytes for the API check above).
-    image.stream.seek(0)
 
     image_url = upload_image_to_storage(image, extension)
 
@@ -956,6 +1087,8 @@ def submit():
         "report_number": report_number,
         "name": username,
         "description": description,
+        "category": category,
+        "subcategory": subcategory,
         "location": location,
         "image": image_url,
         "status": "Reported",
@@ -964,52 +1097,74 @@ def submit():
         "citizen_id": citizen_id,
         "points_awarded": 0,
         "denial_reason": "",
-        "department": department,
-        "subcategory": subcategory,
-        "ward_number": ward_number,
         "created_at": firestore.SERVER_TIMESTAMP
     })
+
     flash(
-        "🎉 Report received! Thank you for helping keep the city clean.",
-        "success"
+        "🎉 Report received! Thank you for helping keep the city clean."
     )
+
     return redirect(url_for("profile"))
-    # =========================================================
+
+
+# =========================================================
 # MUNICIPALITY LOGIN
 # =========================================================
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
+
     if request.method == "POST":
+
         username = request.form.get("username")
+
         password = request.form.get("password")
+
         if (
             username == ADMIN_USERNAME
             and check_password_hash(ADMIN_PASSWORD_HASH, password or "")
         ):
+
             session.permanent = True
+
             session["admin_logged_in"] = True
+
             return redirect(url_for("admin"))
-        flash("Wrong municipality username or password.", "error")
+
+        flash("Wrong municipality username or password.")
+
     return render_template("login.html")
+
+
 # =========================================================
 # MUNICIPALITY LOGOUT
 # =========================================================
+
 @app.route("/logout")
 def logout():
+
     session.pop("admin_logged_in", None)
+
     return redirect(url_for("login"))
+
+
 # =========================================================
 # MUNICIPALITY DASHBOARD
 # =========================================================
+
 @app.route("/admin")
 def admin():
+
     if not session.get("admin_logged_in"):
+
         return redirect(url_for("login"))
+
     complaint_docs = list(
         db.collection("complaints")
         .order_by("created_at", direction=firestore.Query.DESCENDING)
         .stream()
     )
+
     # Batch-fetch usernames for all citizen_ids referenced, instead of
     # one query per complaint (mirrors the old SQL LEFT JOIN).
     citizen_ids = {
@@ -1017,108 +1172,217 @@ def admin():
         for doc in complaint_docs
         if doc.to_dict().get("citizen_id")
     }
+
     usernames_by_id = {}
+
     for cid in citizen_ids:
+
         user_doc = db.collection("users").document(cid).get()
+
         if user_doc.exists:
+
             usernames_by_id[cid] = user_doc.to_dict().get("username")
+
     complaints = []
+
     for doc in complaint_docs:
+
         data = doc.to_dict()
+
         data["id"] = doc.id
+
         data["citizen_username"] = usernames_by_id.get(data.get("citizen_id"))
+
         complaints.append(data)
+
     return render_template(
         "admin.html",
         complaints=complaints
     )
-# =========================================================
-# REVIEW A SINGLE REPORT (admin) — open a report to review it
-# in full: large photo, description, and a map of the pin.
-# =========================================================
-@app.route("/admin/report/<complaint_id>")
-def admin_report_detail(complaint_id):
-    if not session.get("admin_logged_in"):
-        return redirect(url_for("login"))
-    complaint_doc = db.collection("complaints").document(complaint_id).get()
-    if not complaint_doc.exists:
-        flash("That report no longer exists.", "error")
-        return redirect(url_for("admin"))
-    complaint = complaint_doc.to_dict()
-    complaint["id"] = complaint_doc.id
-    citizen_username = None
-    citizen = None
-    if complaint.get("citizen_id"):
-        user_doc = db.collection("users").document(complaint["citizen_id"]).get()
-        if user_doc.exists:
-            citizen = user_doc.to_dict()
-            citizen_username = citizen.get("username")
-    complaint["citizen_username"] = complaint.get("name") or citizen_username
-    return render_template(
-        "admin_report_detail.html",
-        c=complaint,
-        citizen=citizen
-    )
+
+
 # =========================================================
 # MANAGE CITIZENS (admin) — view + delete citizen accounts
 # =========================================================
+
 @app.route("/admin/users")
 def admin_users():
+
     if not session.get("admin_logged_in"):
+
         return redirect(url_for("login"))
+
     user_docs = (
         db.collection("users")
         .order_by("username")
         .stream()
     )
+
     users = []
+
     for doc in user_docs:
+
         data = doc.to_dict()
+
         data["id"] = doc.id
+
         badge_icon, badge_name = get_badge(data.get("points", 0))
+
         data["badge_icon"] = badge_icon
+
         data["badge_name"] = badge_name
+
         users.append(data)
+
     return render_template("admin_users.html", users=users)
+
+
 @app.route("/admin/delete-user/<user_id>", methods=["POST"])
 def admin_delete_user(user_id):
+
     if not session.get("admin_logged_in"):
+
         return redirect(url_for("login"))
+
     user_ref = db.collection("users").document(user_id)
+
     if not user_ref.get().exists:
-        flash("That account no longer exists.", "error")
+
+        flash("That account no longer exists.")
+
         return redirect(url_for("admin_users"))
+
     user_ref.delete()
-    flash("🗑️ Citizen account deleted.", "success")
+
+    flash("🗑️ Citizen account deleted.")
+
     return redirect(url_for("admin_users"))
+
+
+@app.route("/admin/warn-user/<user_id>", methods=["POST"])
+def admin_warn_user(user_id):
+
+    if not session.get("admin_logged_in"):
+
+        return redirect(url_for("login"))
+
+    warning_message = request.form.get("warning_message", "").strip()
+
+    if not warning_message:
+
+        flash("Please write a warning message before sending.")
+
+        return redirect(url_for("admin_users"))
+
+    user_ref = db.collection("users").document(user_id)
+
+    user_doc = user_ref.get()
+
+    if not user_doc.exists:
+
+        flash("That account no longer exists.")
+
+        return redirect(url_for("admin_users"))
+
+    user = user_doc.to_dict()
+
+    user_ref.update({
+        "warning_message": warning_message,
+        "warning_issued_at": firestore.SERVER_TIMESTAMP,
+        "warning_acknowledged": False
+    })
+
+    email = user.get("email")
+
+    if email:
+
+        send_email(
+            to_email=email,
+            subject="⚠️ Warning from CleanCity Municipality",
+            body_text=(
+                f"Hi {user.get('username', 'Citizen')},\n\n"
+                "The CleanCity municipality team has issued a warning "
+                "on your account:\n\n"
+                f'"{warning_message}"\n\n'
+                "Please log in and acknowledge this warning. If the "
+                "issue isn't resolved, your account may be deleted.\n\n"
+                "— CleanCity Municipality"
+            )
+        )
+
+    flash(f"⚠️ Warning sent to {user.get('username', 'the citizen')}.")
+
+    return redirect(url_for("admin_users"))
+
+
+# =========================================================
+# ACKNOWLEDGE WARNING (citizen)
+# =========================================================
+
+@app.route("/acknowledge-warning", methods=["POST"])
+def acknowledge_warning():
+
+    if not session.get("citizen_id"):
+
+        return redirect(url_for("citizen_login"))
+
+    citizen_id = session["citizen_id"]
+
+    db.collection("users").document(citizen_id).update({
+        "warning_acknowledged": True
+    })
+
+    flash("Thanks for acknowledging the warning.")
+
+    return redirect(request.referrer or url_for("dashboard"))
+
+
 # =========================================================
 # UPDATE COMPLAINT STATUS
 # =========================================================
+
 @app.route("/update/<complaint_id>", methods=["POST"])
 def update_status(complaint_id):
+
     if not session.get("admin_logged_in"):
+
         return redirect(url_for("login"))
+
     new_status = request.form.get("status")
+
     denial_reason = request.form.get("reason", "").strip()
+
     if new_status == "Denied" and len(denial_reason) < 3:
-        flash("Please give a reason (at least 3 characters) when denying a complaint.", "error")
+
+        flash("Please give a reason (at least 3 characters) when denying a complaint.")
+
         return redirect(url_for("admin"))
+
     complaint_ref = db.collection("complaints").document(complaint_id)
+
     complaint_doc = complaint_ref.get()
+
     if not complaint_doc.exists:
+
         return "Complaint not found"
+
     complaint = complaint_doc.to_dict()
+
     old_status = complaint.get("status")
+
     # -----------------------------------------------------
     # RESOLVED = GIVE POINTS
     # -----------------------------------------------------
+
     if (
         new_status == "Resolved"
         and old_status != "Resolved"
         and complaint.get("points_awarded", 0) == 0
         and complaint.get("citizen_id")
     ):
+
         points = 10
+
         db.collection("users").document(complaint["citizen_id"]).update({
             "points": Increment(points)
         })
@@ -1159,13 +1423,13 @@ def delete_complaint(complaint_id):
 
     if not complaint_ref.get().exists:
 
-        flash("That report no longer exists.", "error")
+        flash("That report no longer exists.")
 
         return redirect(url_for("admin"))
 
     complaint_ref.delete()
 
-    flash("🗑️ Report deleted.", "success")
+    flash("🗑️ Report deleted.")
 
     return redirect(url_for("admin"))
 

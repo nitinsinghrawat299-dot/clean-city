@@ -1,239 +1,282 @@
-{% extends "base.html" %}
-{% block title %}Report an Issue — SPR{% endblock %}
+<!DOCTYPE html>
+<html lang="en">
 
-{% block extra_head %}
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-<style>
-  .pin-map{width:100%; height:240px; border-radius:12px; overflow:hidden; border:1px solid var(--border); margin-top:4px;}
-</style>
-{% endblock %}
+<head>
 
-{% block content %}
-<section style="padding:44px 0;">
-  <div class="wrap">
-    <div class="dash-header">
-      <h1>Report an Issue</h1>
-      <p>Help us keep {{ session.get('citizen_username', 'your') }}'s city clean by reporting issues you see, {{ session.get('citizen_username', 'citizen') }}.</p>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>CleanCity</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    >
+
+</head>
+
+
+<body>
+
+
+<nav>
+
+    <a href="/" class="nav-logo-link"><h2>🌱 CleanCity</h2></a>
+
+    <div>
+
+        <a href="/dashboard">
+            Report
+        </a>
+
+        <a href="/profile">
+            My Impact
+        </a>
+
+        <a href="/leaderboard">
+            🏆 Leaderboard
+        </a>
+
+        <a href="/citizen-logout">
+            Logout
+        </a>
+
     </div>
 
-    <div class="dash-grid">
-      <!-- REPORT FORM — follows the SPR steps: Snap, Pin, Report -->
-      <div class="card card-lg">
-        <form method="POST" action="{{ url_for('submit') }}" enctype="multipart/form-data" id="reportForm">
+</nav>
 
-          <div class="spr-step">
-            <div class="spr-step-head">
-              <span class="spr-step-num">1</span>
-              <div>
-                <h3>Snap</h3>
-                <p>Take a clear photo of the issue.</p>
-              </div>
-            </div>
-            <div class="field" style="margin-bottom:0;">
-              <label class="upload-drop" id="dropLabel">
-                <input type="file" name="image" id="imageInput" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp" capture="environment" required>
-                <div id="dropText">📷 Tap to take a live photo<br><span style="font-size:.78rem;">Must be taken now with your camera — old photos from your gallery won't be accepted</span></div>
-              </label>
-              <div class="upload-preview" id="previewWrap">
-                <img id="previewImg" src="" alt="Preview">
-              </div>
-            </div>
-          </div>
 
-          <div class="spr-step">
-            <div class="spr-step-head">
-              <span class="spr-step-num">2</span>
-              <div>
-                <h3>Pin</h3>
-                <p>Tell us exactly where it is.</p>
-              </div>
-            </div>
-            <div class="field">
-              <label for="location">Location</label>
-              <input type="text" id="location" name="location" required placeholder="Enter a location or area name">
-            </div>
-            <div class="field">
-              <label for="address">Address <span style="font-weight:400; color:var(--text-muted);">(optional)</span></label>
-              <input type="text" id="address" name="address" placeholder="Nearest landmark or address">
-            </div>
-            <input type="hidden" id="coordinates" name="coordinates" value="">
-            <button type="button" class="btn btn-ghost" id="useLocationBtn">📍 Use My Location</button>
-            <p id="mapHint" style="color:var(--text-muted); font-size:.82rem; margin:10px 0 6px;">Drag the pin (or tap the map) to fine-tune the exact spot before submitting.</p>
-            <div id="pinMap" class="pin-map"></div>
-          </div>
+<main>
 
-          <div class="spr-step">
-            <div class="spr-step-head">
-              <span class="spr-step-num">3</span>
-              <div>
-                <h3>Classify</h3>
-                <p>What kind of issue is this, and which ward?</p>
-              </div>
-            </div>
-            <div class="field">
-              <label for="department">Department</label>
-              <select id="department" name="department" required>
-                <option value="" disabled selected>Select a department</option>
-                {% for dept in department_categories %}
-                  <option value="{{ dept }}">{{ dept }}</option>
-                {% endfor %}
-              </select>
-            </div>
-            <div class="field">
-              <label for="subcategory">Issue type</label>
-              <select id="subcategory" name="subcategory" required disabled>
-                <option value="" disabled selected>Select a department first</option>
-              </select>
-            </div>
-            <div class="field" style="margin-bottom:0;">
-              <label for="ward_number">Ward number</label>
-              <select id="ward_number" name="ward_number" required>
-                <option value="" disabled selected>Select your ward</option>
-                {% for w in ward_numbers %}
-                  <option value="{{ w }}">Ward {{ w }}</option>
-                {% endfor %}
-              </select>
-            </div>
-          </div>
 
-          <div class="spr-step">
-            <div class="spr-step-head">
-              <span class="spr-step-num">4</span>
-              <div>
-                <h3>Report</h3>
-                <p>Add any extra detail, then send it in.</p>
-              </div>
-            </div>
-            <div class="field" style="margin-bottom:0;">
-              <label for="description">Description <span style="font-weight:400; color:var(--text-muted);">(optional)</span></label>
-              <textarea id="description" name="description" maxlength="1000" placeholder="Anything the municipality should know? (optional)"></textarea>
-            </div>
-          </div>
+{% if active_warning %}
 
-          <button type="submit" class="btn btn-primary btn-block" style="margin-top:8px;">Submit Report</button>
-        </form>
-      </div>
+<section class="card warning-banner">
 
-      <!-- QUICK LINKS / SIDEBAR -->
-      <div style="display:flex; flex-direction:column; gap:20px;">
-        <div class="card">
-          <h3 style="font-size:1.05rem; margin-bottom:14px;">Your account</h3>
-          <p style="color:var(--text-muted); font-size:.9rem; margin-bottom:18px;">Signed in as <strong style="color:var(--text-main);">{{ session.get('citizen_username','') }}</strong></p>
-          <div style="display:flex; flex-direction:column; gap:10px;">
-            <a href="{{ url_for('profile') }}" class="btn btn-ghost btn-block">👤 View My Profile &amp; Reports</a>
-            <a href="{{ url_for('leaderboard') }}" class="btn btn-ghost btn-block">🏆 View Leaderboard</a>
-          </div>
-        </div>
+    <h2>
+        ⚠️ A Warning From CleanCity Municipality
+    </h2>
 
-        <div class="card">
-          <h3 style="font-size:1.05rem; margin-bottom:10px;">Tips for a good report</h3>
-          <ul style="color:var(--text-muted); font-size:.88rem; padding-left:18px; display:flex; flex-direction:column; gap:8px;">
-            <li>Take the photo close enough that the garbage is clearly visible.</li>
-            <li>Use "Use My Location" so the municipality can find the exact spot.</li>
-            <li>Add a nearby landmark in Address if GPS isn't precise.</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  </div>
+    <p>
+        {{ active_warning }}
+    </p>
+
+    <form method="POST" action="/acknowledge-warning">
+
+        <button type="submit">
+            I Understand
+        </button>
+
+    </form>
+
 </section>
-{% endblock %}
 
-{% block extra_scripts %}
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-<script>
-  // ---- Department -> subcategory dropdown ----
-  const DEPARTMENT_CATEGORIES = {{ department_categories | tojson }};
-  const departmentSelect = document.getElementById('department');
-  const subcategorySelect = document.getElementById('subcategory');
+{% endif %}
 
-  departmentSelect.addEventListener('change', () => {
-    const subcats = DEPARTMENT_CATEGORIES[departmentSelect.value] || [];
-    subcategorySelect.innerHTML = '<option value="" disabled selected>Select an issue type</option>';
-    subcats.forEach(sub => {
-      const opt = document.createElement('option');
-      opt.value = sub;
-      opt.textContent = sub;
-      subcategorySelect.appendChild(opt);
-    });
-    subcategorySelect.disabled = subcats.length === 0;
-  });
 
-  // ---- Pin map: lets the citizen see & fine-tune the exact spot ----
-  const DEFAULT_CENTER = [30.1500, 78.7800]; // Pauri Garhwal, as a sensible default
-  const coordsField = document.getElementById('coordinates');
+<section class="hero">
 
-  const pinMap = L.map('pinMap', { scrollWheelZoom: false }).setView(DEFAULT_CENTER, 13);
+    <h1>
+        Snap. Pin. Report. 🌱
+    </h1>
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; OpenStreetMap contributors'
-  }).addTo(pinMap);
+    <p>
+        Help make your city cleaner in just a few seconds.
+    </p>
 
-  const pinMarker = L.marker(DEFAULT_CENTER, { draggable: true }).addTo(pinMap);
+</section>
 
-  function setCoordinates(lat, lng) {
-    coordsField.value = lat.toFixed(6) + ',' + lng.toFixed(6);
-  }
 
-  function movePin(lat, lng, zoom) {
-    pinMarker.setLatLng([lat, lng]);
-    pinMap.setView([lat, lng], zoom || pinMap.getZoom());
-    setCoordinates(lat, lng);
-  }
+{% with messages = get_flashed_messages() %}
 
-  // Dragging the pin updates the coordinates sent with the report.
-  pinMarker.on('dragend', () => {
-    const pos = pinMarker.getLatLng();
-    setCoordinates(pos.lat, pos.lng);
-  });
+    {% if messages %}
 
-  // Tapping/clicking anywhere on the map moves the pin there too.
-  pinMap.on('click', (e) => {
-    movePin(e.latlng.lat, e.latlng.lng);
-  });
+        {% for message in messages %}
 
-  // If a report is being re-submitted with existing coordinates,
-  // start the pin there instead of the default center.
-  if (coordsField.value) {
-    const [lat, lng] = coordsField.value.split(',').map(Number);
-    if (!isNaN(lat) && !isNaN(lng)) movePin(lat, lng, 16);
-  }
+            <div class="flash">
+                {{ message }}
+            </div>
 
-  const imageInput = document.getElementById('imageInput');
-  const previewWrap = document.getElementById('previewWrap');
-  const previewImg = document.getElementById('previewImg');
-  const dropText = document.getElementById('dropText');
+        {% endfor %}
 
-  imageInput.addEventListener('change', () => {
-    const file = imageInput.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = e => {
-      previewImg.src = e.target.result;
-      previewWrap.style.display = 'block';
-      dropText.innerHTML = '✅ ' + file.name;
-    };
-    reader.readAsDataURL(file);
-  });
+    {% endif %}
 
-  document.getElementById('useLocationBtn').addEventListener('click', () => {
-    const btn = document.getElementById('useLocationBtn');
-    if (!navigator.geolocation) {
-      alert('Location access is not supported by this browser.');
-      return;
-    }
-    btn.textContent = 'Locating…';
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        movePin(pos.coords.latitude, pos.coords.longitude, 16);
-        btn.textContent = '📍 Location captured';
-      },
-      () => {
-        btn.textContent = '📍 Use My Location';
-        alert('Could not get your location. You can still fill in Location/Address manually, or drag the pin on the map.');
-      }
-    );
-  });
-</script>
-{% endblock %}
+{% endwith %}
+
+
+<section class="card">
+
+
+    <h2>
+        📸 Report Garbage
+    </h2>
+
+
+    <form
+        action="/submit"
+        method="POST"
+        enctype="multipart/form-data"
+        id="report-form"
+    >
+
+
+        <!-- PHOTO -->
+
+        <label>
+            1️⃣ 📸 Snap the garbage
+        </label>
+
+
+        <input
+            type="file"
+            name="image"
+            accept="image/*"
+            capture="environment"
+            required
+        >
+
+        <p class="field-hint">
+            Opens your camera — the photo is automatically stamped with
+            your GPS location and the time.
+        </p>
+
+
+        <!-- LOCATION -->
+
+        <label>
+            2️⃣ 📍 Pin the location
+        </label>
+
+
+        <button
+            type="button"
+            onclick="getLocation()"
+            class="location-button"
+        >
+            📍 Find My Location
+        </button>
+
+
+        <p
+            id="location-status"
+            class="location-status"
+        >
+            Location not selected yet.
+        </p>
+
+
+        <div
+            id="map"
+            class="report-map"
+        ></div>
+
+
+        <input
+            type="text"
+            id="location"
+            name="location"
+            placeholder="Location will appear here"
+            readonly
+            required
+        >
+
+
+        <input
+            type="hidden"
+            id="coordinates"
+            name="coordinates"
+        >
+
+
+        <input
+            type="hidden"
+            id="address"
+            name="address"
+        >
+
+
+        <!-- COMPLAINT CATEGORY (multi-tier) -->
+
+        <label>
+            3️⃣ 🗂️ What kind of issue is this?
+        </label>
+
+        <select id="category-level1" name="category" required>
+            <option value="" disabled selected>
+                Choose a department...
+            </option>
+        </select>
+
+        <select id="category-level2" name="subcategory" required disabled>
+            <option value="" disabled selected>
+                Choose a department first...
+            </option>
+        </select>
+
+
+        <!-- OPTIONAL DESCRIPTION -->
+
+        <label>
+            4️⃣ 📝 Anything to add?
+            <span class="optional">
+                Optional
+            </span>
+        </label>
+
+
+        <textarea
+            name="description"
+            placeholder="Add details if you want..."
+        ></textarea>
+
+
+        <!-- SUBMIT -->
+
+        <button
+            type="submit"
+            class="report-button"
+        >
+            🚀 REPORT IT!
+        </button>
+
+
+    </form>
+
+
+</section>
+
+
+</main>
+
+
+<footer>
+
+    <p>
+        CleanCity © 2026 🌍
+    </p>
+
+</footer>
+
+
+<script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+></script>
+
+
+<script
+    src="{{ url_for('static', filename='script.js') }}"
+></script>
+
+
+</body>
+
+</html>

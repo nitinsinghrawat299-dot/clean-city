@@ -1,6 +1,7 @@
 Flask
 python-dotenv
 requests
-firebase-admin
+google-cloud-firestore==2.16.1
+google-auth
 cloudinary
 gunicorn
