@@ -73,7 +73,7 @@ def submit():
  f=request.files.get('image');
  if not f or not f.filename or not allowed(f.filename): flash('Please upload a valid image.'); return redirect(url_for('home'))
  num=one('SELECT COALESCE(MAX(report_number),0)+1 n FROM complaints')['n']; cid=uuid.uuid4().hex; img=save_image(f)
- run('INSERT INTO complaints VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)',(cid,num,session.get('citizen_username','Citizen'),request.form.get('description','')[:1000],request.form.get('location',''),img,'Reported',request.form.get('coordinates',''),request.form.get('address',''),session['citizen_id'],0,'',datetime.datetime.utcnow().isoformat())); flash('🎉 Report received!'); return redirect(url_for('profile'))
+run('INSERT INTO complaints VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',(cid,num,session.get('citizen_username','Citizen'),request.form.get('description','')[:1000],request.form.get('location',''),img,'Reported',request.form.get('coordinates',''),request.form.get('address',''),session['citizen_id'],0,'',datetime.datetime.utcnow().isoformat())); flash('🎉 Report received!'); return redirect(url_for('profile'))
 @app.route('/login',methods=['GET','POST'])
 def login():
  if request.method=='POST' and request.form.get('username')==ADMIN_USERNAME and request.form.get('password')==ADMIN_PASSWORD: session['admin_logged_in']=True; return redirect(url_for('admin'))
