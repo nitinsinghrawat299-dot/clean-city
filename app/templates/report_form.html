@@ -1,29 +1,139 @@
 {% extends "base.html" %}
-{% block title %}Reset Password — SPR{% endblock %}
+{% block title %}{{ subcategory.title }} — SPR{% endblock %}
 
 {% block content %}
-<section class="auth-shell">
-  <div class="auth-card">
-    <h1>Reset Your Password</h1>
-    <p class="sub">Choose a new password for your account.</p>
+<section style="padding:44px 0;">
+  <div class="wrap" style="max-width:640px;">
+    <a href="{{ url_for('report_category', cat_key=cat_key) }}" class="btn btn-ghost btn-sm" style="margin-bottom:18px;">← Back</a>
 
-    <form method="POST" action="{{ url_for('reset_password', token=token) }}">
-      <div class="field">
-        <label for="password">New Password</label>
-        <div class="input-row">
-          <input type="password" id="password" name="password" required minlength="4" autofocus placeholder="Create a new password">
-          <button type="button" class="toggle-visibility" onclick="const f=document.getElementById('password'); f.type = f.type==='password' ? 'text' : 'password'; this.textContent = f.type==='password' ? '👁️' : '🙈';">👁️</button>
+    <div class="dash-header">
+      <h1>{{ category.icon }} {{ subcategory.title }}</h1>
+      <p>Snap a photo, pin the location, and add a few details.</p>
+    </div>
+
+    <form method="POST" action="{{ url_for('submit') }}" enctype="multipart/form-data" id="reportForm">
+      <input type="hidden" name="category" value="{{ cat_key }}">
+      <input type="hidden" name="subcategory" value="{{ sub_key }}">
+      <input type="hidden" name="coordinates" id="coordinates" value="">
+
+      <div class="card card-lg">
+
+        <div class="field">
+          <label>1. Take a Photo</label>
+          <div class="photo-capture" id="photoCapture">
+            <img id="photoPreview" alt="Captured photo" style="display:none;">
+            <div id="photoPlaceholder" class="photo-placeholder">
+              <span style="font-size:2rem;">📷</span>
+              <span>Tap below to open your camera</span>
+            </div>
+          </div>
+          <input type="file" name="image" id="imageInput" accept="image/*" capture="environment" required style="display:none;">
+          <div style="display:flex; gap:10px; margin-top:10px;">
+            <button type="button" class="btn btn-primary btn-sm" id="takePhotoBtn">📷 Open Camera</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="retakeBtn" style="display:none;">↺ Retake</button>
+          </div>
         </div>
-        <p class="field-note">At least 4 characters.</p>
-      </div>
 
-      <div class="field">
-        <label for="confirm_password">Confirm New Password</label>
-        <input type="password" id="confirm_password" name="confirm_password" required placeholder="Confirm your new password">
-      </div>
+        <div class="field">
+          <label>2. Pin Your Location</label>
+          <div id="reportMap" class="report-map" style="display:none;"></div>
+          <p class="field-note" id="locationStatus">No location pinned yet.</p>
+          <button type="button" class="btn btn-primary btn-sm" id="pinLocationBtn" style="margin-top:8px;">📍 Pin My Location</button>
+        </div>
 
-      <button type="submit" class="btn btn-primary btn-block" style="margin-top:8px;">Reset Password</button>
+        <div class="field">
+          <label for="description">3. Description</label>
+          <textarea id="description" name="description" required maxlength="1000" placeholder="Describe what you're reporting..."></textarea>
+        </div>
+
+        <div class="field">
+          <label for="location">Nearest Landmark <span style="font-weight:400; color:var(--text-faint);">(optional)</span></label>
+          <input type="text" id="location" name="location" placeholder="e.g. Near Bus Stand, Pauri">
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block" id="submitBtn" disabled>Submit Report</button>
+        <p class="field-note" id="submitHint" style="text-align:center; margin-top:10px;">Take a photo and pin your location to enable submitting.</p>
+      </div>
     </form>
   </div>
 </section>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function(){
+  var imageInput=document.getElementById('imageInput');
+  var takePhotoBtn=document.getElementById('takePhotoBtn');
+  var retakeBtn=document.getElementById('retakeBtn');
+  var photoPreview=document.getElementById('photoPreview');
+  var photoPlaceholder=document.getElementById('photoPlaceholder');
+  var pinLocationBtn=document.getElementById('pinLocationBtn');
+  var mapDiv=document.getElementById('reportMap');
+  var locationStatus=document.getElementById('locationStatus');
+  var coordinatesInput=document.getElementById('coordinates');
+  var submitBtn=document.getElementById('submitBtn');
+  var submitHint=document.getElementById('submitHint');
+  var map=null, marker=null, hasPhoto=false, hasLocation=false;
+
+  function checkReady(){
+    if(hasPhoto && hasLocation){ submitBtn.disabled=false; submitHint.style.display='none'; }
+    else { submitBtn.disabled=true; submitHint.style.display='block'; }
+  }
+
+  takePhotoBtn.addEventListener('click', function(){ imageInput.click(); });
+
+  imageInput.addEventListener('change', function(){
+    var f=this.files[0];
+    if(!f) return;
+    var url=URL.createObjectURL(f);
+    photoPreview.src=url; photoPreview.style.display='block';
+    photoPlaceholder.style.display='none';
+    takePhotoBtn.style.display='none'; retakeBtn.style.display='inline-flex';
+    hasPhoto=true; checkReady();
+  });
+
+  retakeBtn.addEventListener('click', function(){
+    imageInput.value='';
+    photoPreview.style.display='none'; photoPlaceholder.style.display='flex';
+    takePhotoBtn.style.display='inline-flex'; retakeBtn.style.display='none';
+    hasPhoto=false; checkReady();
+  });
+
+  function dropPin(lat,lng){
+    coordinatesInput.value = lat+','+lng;
+    mapDiv.style.display='block';
+    if(!map){
+      map=L.map('reportMap').setView([lat,lng],16);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+        maxZoom:19, attribution:'&copy; OpenStreetMap contributors'
+      }).addTo(map);
+      marker=L.marker([lat,lng],{draggable:true}).addTo(map);
+      marker.on('dragend', function(){
+        var p=marker.getLatLng();
+        coordinatesInput.value = p.lat.toFixed(6)+','+p.lng.toFixed(6);
+        locationStatus.textContent='📍 Location pinned — drag the marker to fine-tune.';
+      });
+    } else {
+      map.setView([lat,lng],16);
+      marker.setLatLng([lat,lng]);
+    }
+    setTimeout(function(){ map.invalidateSize(); }, 200);
+    locationStatus.textContent='📍 Location pinned — drag the marker to fine-tune.';
+    hasLocation=true; checkReady();
+  }
+
+  pinLocationBtn.addEventListener('click', function(){
+    if(!navigator.geolocation){
+      locationStatus.textContent='Geolocation is not supported on this device.';
+      return;
+    }
+    locationStatus.textContent='Getting your location…';
+    navigator.geolocation.getCurrentPosition(function(pos){
+      dropPin(pos.coords.latitude.toFixed(6), pos.coords.longitude.toFixed(6));
+    }, function(){
+      locationStatus.textContent='Could not get your location. Please enable location access and try again.';
+    }, {enableHighAccuracy:true, timeout:10000});
+  });
+})();
+</script>
 {% endblock %}
