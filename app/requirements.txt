@@ -1,6 +1,3 @@
-Flask
-python-dotenv
-requests
-firebase-admin
-cloudinary
-gunicorn
+Flask>=3.0
+python-dotenv>=1.0
+Werkzeug>=3.0
