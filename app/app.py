@@ -162,11 +162,33 @@ def logout(): session.pop('admin_logged_in',None); return redirect(url_for('logi
 @app.route('/admin')
 def admin():
  if not session.get('admin_logged_in'): return redirect(url_for('login'))
- q='SELECT c.*,u.username citizen_username FROM complaints c LEFT JOIN users u ON c.citizen_id=u.id ORDER BY c.created_at DESC'
+ tiles=[]
+ for cat_key,cat in CATEGORIES.items():
+  total=one('SELECT COUNT(*) n FROM complaints WHERE category=?',(cat_key,))['n']
+  resolved=one("SELECT COUNT(*) n FROM complaints WHERE category=? AND status='Resolved'",(cat_key,))['n']
+  denied=one("SELECT COUNT(*) n FROM complaints WHERE category=? AND status='Denied'",(cat_key,))['n']
+  tiles.append({'cat_key':cat_key,'icon':cat['icon'],'title':cat['title'],'pending':total-resolved-denied})
+ total_uncategorized=one("SELECT COUNT(*) n FROM complaints WHERE category IS NULL OR category=''")['n']
+ uncategorized_resolved=one("SELECT COUNT(*) n FROM complaints WHERE (category IS NULL OR category='') AND status='Resolved'")['n']
+ uncategorized_denied=one("SELECT COUNT(*) n FROM complaints WHERE (category IS NULL OR category='') AND status='Denied'")['n']
+ uncategorized_pending=total_uncategorized-uncategorized_resolved-uncategorized_denied
+ return render_template('admin_categories.html',tiles=tiles,total_uncategorized=total_uncategorized,uncategorized_pending=uncategorized_pending)
+@app.route('/admin/reports/<cat_key>')
+def admin_reports(cat_key):
+ if not session.get('admin_logged_in'): return redirect(url_for('login'))
+ if cat_key=='uncategorized':
+  q="SELECT c.*,u.username citizen_username FROM complaints c LEFT JOIN users u ON c.citizen_id=u.id WHERE c.category IS NULL OR c.category='' ORDER BY c.created_at DESC"
+  comps=[]
+  for x in rows(q):
+   d=dict(x); d['created_at']=parse_dt(d['created_at']); comps.append(d)
+  return render_template('admin.html',complaints=comps,cat_title='🗂️ Uncategorized',cat_key=cat_key)
+ cat=CATEGORIES.get(cat_key)
+ if not cat: return redirect(url_for('admin'))
+ q='SELECT c.*,u.username citizen_username FROM complaints c LEFT JOIN users u ON c.citizen_id=u.id WHERE c.category=? ORDER BY c.created_at DESC'
  comps=[]
- for x in rows(q):
+ for x in rows(q,(cat_key,)):
   d=dict(x); d['created_at']=parse_dt(d['created_at']); comps.append(d)
- return render_template('admin.html',complaints=comps)
+ return render_template('admin.html',complaints=comps,cat_title=cat['icon']+' '+cat['title'],cat_key=cat_key)
 @app.route('/admin/users')
 def admin_users():
  if not session.get('admin_logged_in'): return redirect(url_for('login'))
@@ -180,12 +202,16 @@ def admin_delete_user(user_id): run('DELETE FROM users WHERE id=?',(user_id,)); 
 def update_status(complaint_id):
  if not session.get('admin_logged_in'): return redirect(url_for('login'))
  s=request.form.get('status','Reported'); r=request.form.get('reason','').strip(); c=one('SELECT * FROM complaints WHERE id=?',(complaint_id,))
+ cat_key=request.form.get('cat_key','')
  if c and s=='Resolved' and c['status']!='Resolved' and not c['points_awarded']:
   run('UPDATE users SET points=points+10 WHERE id=?',(c['citizen_id'],)); run("UPDATE complaints SET status='Resolved',points_awarded=10 WHERE id=?",(complaint_id,))
  else: run('UPDATE complaints SET status=?,denial_reason=? WHERE id=?',(s,r if s=='Denied' else c['denial_reason'],complaint_id))
- return redirect(url_for('admin'))
+ return redirect(url_for('admin_reports',cat_key=cat_key) if cat_key else url_for('admin'))
 @app.route('/delete/<complaint_id>',methods=['POST'])
-def delete_complaint(complaint_id): run('DELETE FROM complaints WHERE id=?',(complaint_id,)); return redirect(url_for('admin'))
+def delete_complaint(complaint_id):
+ if not session.get('admin_logged_in'): return redirect(url_for('login'))
+ cat_key=request.form.get('cat_key',''); run('DELETE FROM complaints WHERE id=?',(complaint_id,))
+ return redirect(url_for('admin_reports',cat_key=cat_key) if cat_key else url_for('admin'))
 @app.route('/paurigarhwal')
 def pauri_garhwal():
  return render_template('paurigarhwal.html')
