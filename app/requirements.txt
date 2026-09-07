@@ -2,4 +2,5 @@ Flask>=3.0
 python-dotenv>=1.0
 Werkzeug>=3.0
 gunicorn>=21.2
-psycopg2-binary>=2.9
+firebase-admin>=6.5
+cloudinary>=1.40

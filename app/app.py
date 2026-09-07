@@ -1,18 +1,31 @@
-import os, uuid, datetime, secrets, smtplib, ssl
-import psycopg2, psycopg2.extras, psycopg2.errors
-from email.mime.text import MIMEText
+import os, uuid, json, datetime
+import firebase_admin
+from firebase_admin import credentials, firestore
+import cloudinary, cloudinary.uploader
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 
 load_dotenv(); BASE=os.path.dirname(os.path.abspath(__file__))
 app=Flask(__name__); app.secret_key=os.getenv('SECRET_KEY','clean-city-local-secret-change-me')
 app.jinja_env.globals['category_label']=lambda ck,sk: category_label(ck,sk)
 app.config['PERMANENT_SESSION_LIFETIME']=datetime.timedelta(days=14)
-UPLOAD=os.path.join(BASE,'static','uploads'); os.makedirs(UPLOAD,exist_ok=True)
-DATABASE_URL=os.getenv('DATABASE_URL'); ALLOWED={'png','jpg','jpeg','gif','webp'}
+ALLOWED={'png','jpg','jpeg','gif','webp'}
 ADMIN_USERNAME=os.getenv('ADMIN_USERNAME','admin'); ADMIN_PASSWORD_HASH=os.getenv('ADMIN_PASSWORD_HASH','')
+
+# ---- Firebase / Firestore ----
+_cred_json=os.getenv('FIREBASE_SERVICE_ACCOUNT_JSON')
+if _cred_json and not firebase_admin._apps:
+ firebase_admin.initialize_app(credentials.Certificate(json.loads(_cred_json)))
+db=firestore.client()
+
+# ---- Cloudinary ----
+cloudinary.config(
+ cloud_name=os.getenv('CLOUDINARY_CLOUD_NAME'),
+ api_key=os.getenv('CLOUDINARY_API_KEY'),
+ api_secret=os.getenv('CLOUDINARY_API_SECRET'),
+ secure=True
+)
 
 # ---- Complaint categories & subcategories ----
 # 'enabled': True subcategories use the existing Snap-Pin-Report form.
@@ -58,39 +71,22 @@ def category_label(cat_key,sub_key):
  if not sub: return cat['icon']+' '+cat['title']
  return cat['icon']+' '+sub['title']
 
-def conn():
- c=psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor); return c
-
-def _pg(q): return q.replace('?','%s')  # lets every existing '?' placeholder work unchanged
-
-def init_db():
- c=conn(); cur=c.cursor()
- cur.execute('''CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,username TEXT UNIQUE,email TEXT UNIQUE,password TEXT,points INTEGER DEFAULT 0,reset_token TEXT,reset_token_expires TEXT,created_at TEXT)''')
- cur.execute('''CREATE TABLE IF NOT EXISTS complaints(id TEXT PRIMARY KEY,report_number INTEGER UNIQUE,name TEXT,description TEXT,location TEXT,image TEXT,status TEXT,coordinates TEXT,address TEXT,citizen_id TEXT,points_awarded INTEGER DEFAULT 0,denial_reason TEXT DEFAULT '',created_at TEXT,category TEXT,subcategory TEXT)''')
- cur.execute('''CREATE TABLE IF NOT EXISTS visits(id TEXT PRIMARY KEY,created_at TEXT)''')
- c.commit()
- for col in ('category','subcategory'):
-  try:
-   cur.execute(f'ALTER TABLE complaints ADD COLUMN {col} TEXT'); c.commit()
-  except psycopg2.errors.DuplicateColumn:
-   c.rollback()
- cur.close(); c.close()
-init_db()
-def rows(q,p=()):
- c=conn(); cur=c.cursor(); cur.execute(_pg(q),p); r=cur.fetchall(); cur.close(); c.close(); return r
-def one(q,p=()):
- c=conn(); cur=c.cursor(); cur.execute(_pg(q),p); r=cur.fetchone(); cur.close(); c.close(); return r
-def run(q,p=()):
- c=conn(); cur=c.cursor(); cur.execute(_pg(q),p); c.commit(); cur.close(); c.close()
+# ---- Firestore helpers ----
+def _doc(snap):
+ if not snap or not snap.exists: return None
+ d=snap.to_dict() or {}; d['id']=snap.id; return d
+def _count(query):
+ return query.count().get()[0][0].value
+def now_iso(): return datetime.datetime.utcnow().isoformat()
 def badge(points):
  return ('🌱','Green Starter') if points<20 else ('🌿','Eco Hero') if points<50 else ('🏆','Clean City Champion')
 def allowed(n): return '.' in n and n.rsplit('.',1)[1].lower() in ALLOWED
 def parse_dt(s):
  try: return datetime.datetime.fromisoformat(s) if s else None
  except Exception: return None
-
 def save_image(f):
- ext=f.filename.rsplit('.',1)[1].lower(); name=f'{uuid.uuid4().hex}.{ext}'; f.save(os.path.join(UPLOAD,name)); return url_for('static',filename='uploads/'+name)
+ result=cloudinary.uploader.upload(f, folder='clean-city-reports')
+ return result['secure_url']
 
 # ---- Site visit tracking (for the admin "Site Visits" widget) ----
 @app.before_request
@@ -98,7 +94,7 @@ def track_visit():
  if request.endpoint=='static' or request.path.startswith('/static'): return
  if session.get('admin_logged_in'): return  # don't count the admin's own browsing
  if not session.get('_visited'):
-  run('INSERT INTO visits VALUES(?,?)',(uuid.uuid4().hex,datetime.datetime.utcnow().isoformat()))
+  db.collection('visits').document(uuid.uuid4().hex).set({'created_at':now_iso()})
   session['_visited']=True
 
 @app.context_processor
@@ -108,17 +104,25 @@ def inject_visit_stats():
  today_start=now.replace(hour=0,minute=0,second=0,microsecond=0).isoformat()
  week_start=(now-datetime.timedelta(days=7)).isoformat()
  month_start=(now-datetime.timedelta(days=30)).isoformat()
+ visits=db.collection('visits')
  return {'visit_stats':{
-  'today':one('SELECT COUNT(*) n FROM visits WHERE created_at>=?',(today_start,))['n'],
-  'week':one('SELECT COUNT(*) n FROM visits WHERE created_at>=?',(week_start,))['n'],
-  'month':one('SELECT COUNT(*) n FROM visits WHERE created_at>=?',(month_start,))['n'],
-  'all':one('SELECT COUNT(*) n FROM visits')['n'],
+  'today':_count(visits.where('created_at','>=',today_start)),
+  'week':_count(visits.where('created_at','>=',week_start)),
+  'month':_count(visits.where('created_at','>=',month_start)),
+  'all':_count(visits),
  }}
 
 @app.route('/')
 def home():
  if session.get('citizen_id'): return render_template('categories.html',categories=CATEGORIES)
- stats={'reports':str(one('SELECT COUNT(*) n FROM complaints')['n']),'users':str(one('SELECT COUNT(*) n FROM users')['n']),'points':str(one('SELECT COALESCE(SUM(points),0) n FROM users')['n']),'areas':str(one("SELECT COUNT(*) n FROM complaints WHERE status='Resolved'")['n'])}; return render_template('landing.html',stats=stats)
+ users_pts=[u.to_dict().get('points',0) for u in db.collection('users').stream()]
+ stats={
+  'reports':str(_count(db.collection('complaints'))),
+  'users':str(len(users_pts)),
+  'points':str(sum(users_pts)),
+  'areas':str(_count(db.collection('complaints').where('status','==','Resolved'))),
+ }
+ return render_template('landing.html',stats=stats)
 @app.route('/report/<cat_key>')
 def report_category(cat_key):
  if not session.get('citizen_id'): return redirect(url_for('citizen_login'))
@@ -139,13 +143,19 @@ def register():
   u=request.form.get('username','').strip(); e=request.form.get('email','').strip().lower(); p=request.form.get('password',''); cp=request.form.get('confirm_password','')
   if len(u)<3 or u.lower() in {'admin','administrator','cleancity'}: flash('Please choose a valid username.'); return redirect(url_for('register'))
   if not e or '@' not in e or p!=cp or len(p)<4: flash('Please check your email and passwords.'); return redirect(url_for('register'))
-  if one('SELECT id FROM users WHERE username=? OR email=?',(u,e)): flash('Username or email already exists.'); return redirect(url_for('register'))
-  run('INSERT INTO users VALUES(?,?,?,?,0,NULL,NULL,?)',(uuid.uuid4().hex,u,e,generate_password_hash(p),datetime.datetime.utcnow().isoformat())); session['prefill_username']=u; session['prefill_password']=p; flash('Account created!'); return redirect(url_for('citizen_login'))
+  dup_u=next(db.collection('users').where('username','==',u).limit(1).stream(),None)
+  dup_e=next(db.collection('users').where('email','==',e).limit(1).stream(),None)
+  if dup_u or dup_e: flash('Username or email already exists.'); return redirect(url_for('register'))
+  uid=uuid.uuid4().hex
+  db.collection('users').document(uid).set({'username':u,'email':e,'password':generate_password_hash(p),'points':0,'reset_token':None,'reset_token_expires':None,'created_at':now_iso()})
+  session['prefill_username']=u; session['prefill_password']=p; flash('Account created!'); return redirect(url_for('citizen_login'))
  return render_template('register.html')
 @app.route('/citizen-login',methods=['GET','POST'])
 def citizen_login():
  if request.method=='POST':
-  u=request.form.get('username','').strip(); p=request.form.get('password',''); x=one('SELECT * FROM users WHERE username=?',(u,))
+  u=request.form.get('username','').strip(); p=request.form.get('password','')
+  snap=next(db.collection('users').where('username','==',u).limit(1).stream(),None)
+  x=_doc(snap) if snap else None
   if x and check_password_hash(x['password'],p): session.permanent=True; session['citizen_id']=x['id']; session['citizen_username']=x['username']; return redirect(url_for('home'))
   flash('Incorrect username or password.')
  return render_template('citizen_login.html',prefill_username=session.pop('prefill_username',''),prefill_password=session.pop('prefill_password',''))
@@ -154,16 +164,22 @@ def citizen_logout(): session.clear(); return redirect(url_for('citizen_login'))
 @app.route('/profile')
 def profile():
  if not session.get('citizen_id'): return redirect(url_for('citizen_login'))
- u=one('SELECT * FROM users WHERE id=?',(session['citizen_id'],)); reps=rows('SELECT * FROM complaints WHERE citizen_id=? ORDER BY created_at DESC',(session['citizen_id'],)); icon,name=badge(u['points']); total=len(reps); resolved=sum(1 for x in reps if x['status']=='Resolved'); return render_template('profile.html',user=dict(u),complaints=[dict(x) for x in reps],badge_icon=icon,badge_name=name,total=total,resolved=resolved)
+ u=_doc(db.collection('users').document(session['citizen_id']).get())
+ if not u: session.clear(); return redirect(url_for('citizen_login'))
+ reps=[_doc(d) for d in db.collection('complaints').where('citizen_id','==',session['citizen_id']).stream()]
+ reps.sort(key=lambda r:r.get('created_at') or '',reverse=True)
+ icon,name=badge(u.get('points',0)); total=len(reps); resolved=sum(1 for x in reps if x.get('status')=='Resolved')
+ return render_template('profile.html',user=u,complaints=reps,badge_icon=icon,badge_name=name,total=total,resolved=resolved)
 @app.route('/delete-account',methods=['POST'])
 def delete_account():
- if session.get('citizen_id'): run('DELETE FROM users WHERE id=?',(session['citizen_id'],)); session.clear(); flash('Account deleted.')
+ if session.get('citizen_id'): db.collection('users').document(session['citizen_id']).delete(); session.clear(); flash('Account deleted.')
  return redirect(url_for('citizen_login'))
 @app.route('/leaderboard')
 def leaderboard():
  data=[]
- for i,u in enumerate(rows('SELECT username,points FROM users ORDER BY points DESC LIMIT 20'),1):
-  ic,b=badge(u['points']); data.append({'rank':i,'username':u['username'],'points':u['points'],'icon':ic,'badge':b})
+ docs=db.collection('users').order_by('points',direction=firestore.Query.DESCENDING).limit(20).stream()
+ for i,u in enumerate(docs,1):
+  ud=u.to_dict() or {}; ic,b=badge(ud.get('points',0)); data.append({'rank':i,'username':ud.get('username',''),'points':ud.get('points',0),'icon':ic,'badge':b})
  return render_template('leaderboard.html',users=data)
 @app.route('/submit',methods=['POST'])
 def submit():
@@ -171,10 +187,19 @@ def submit():
  cat_key=request.form.get('category',''); sub_key=request.form.get('subcategory','')
  cat=CATEGORIES.get(cat_key); sub=cat['subcats'].get(sub_key) if cat else None
  if not cat or not sub or not sub['enabled']: flash('Please choose a valid, available complaint type.'); return redirect(url_for('home'))
- f=request.files.get('image');
+ f=request.files.get('image')
  if not f or not f.filename or not allowed(f.filename): flash('Please upload a valid image.'); return redirect(url_for('report_subcategory',cat_key=cat_key,sub_key=sub_key))
- num=one('SELECT COALESCE(MAX(report_number),0)+1 n FROM complaints')['n']; cid=uuid.uuid4().hex; img=save_image(f)
- run('INSERT INTO complaints VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',(cid,num,session.get('citizen_username','Citizen'),request.form.get('description','')[:1000],request.form.get('location',''),img,'Reported',request.form.get('coordinates',''),request.form.get('address',''),session['citizen_id'],0,'',datetime.datetime.utcnow().isoformat(),cat_key,sub_key)); flash('🎉 Report received!'); return redirect(url_for('profile'))
+ img=save_image(f)
+ num=_count(db.collection('complaints'))+1; cid=uuid.uuid4().hex
+ db.collection('complaints').document(cid).set({
+  'report_number':num,'name':session.get('citizen_username','Citizen'),
+  'description':request.form.get('description','')[:1000],'location':request.form.get('location',''),
+  'image':img,'status':'Reported','coordinates':request.form.get('coordinates',''),
+  'address':request.form.get('address',''),'citizen_id':session['citizen_id'],
+  'citizen_username':session.get('citizen_username','Citizen'),'points_awarded':0,'denial_reason':'',
+  'created_at':now_iso(),'category':cat_key,'subcategory':sub_key,
+ })
+ flash('🎉 Report received!'); return redirect(url_for('profile'))
 @app.route('/login',methods=['GET','POST'])
 def login():
  if request.method=='POST' and request.form.get('username')==ADMIN_USERNAME and ADMIN_PASSWORD_HASH and check_password_hash(ADMIN_PASSWORD_HASH,request.form.get('password','')): session['admin_logged_in']=True; return redirect(url_for('admin'))
@@ -187,70 +212,77 @@ def admin():
  if not session.get('admin_logged_in'): return redirect(url_for('login'))
  tiles=[]
  for cat_key,cat in CATEGORIES.items():
-  total=one('SELECT COUNT(*) n FROM complaints WHERE category=?',(cat_key,))['n']
-  resolved=one("SELECT COUNT(*) n FROM complaints WHERE category=? AND status='Resolved'",(cat_key,))['n']
-  denied=one("SELECT COUNT(*) n FROM complaints WHERE category=? AND status='Denied'",(cat_key,))['n']
+  base=db.collection('complaints').where('category','==',cat_key)
+  total=_count(base); resolved=_count(base.where('status','==','Resolved')); denied=_count(base.where('status','==','Denied'))
   tiles.append({'cat_key':cat_key,'icon':cat['icon'],'title':cat['title'],'pending':total-resolved-denied})
- total_uncategorized=one("SELECT COUNT(*) n FROM complaints WHERE category IS NULL OR category=''")['n']
- uncategorized_resolved=one("SELECT COUNT(*) n FROM complaints WHERE (category IS NULL OR category='') AND status='Resolved'")['n']
- uncategorized_denied=one("SELECT COUNT(*) n FROM complaints WHERE (category IS NULL OR category='') AND status='Denied'")['n']
+ all_complaints=[d.to_dict() or {} for d in db.collection('complaints').stream()]
+ uncategorized=[c for c in all_complaints if not c.get('category')]
+ total_uncategorized=len(uncategorized)
+ uncategorized_resolved=sum(1 for c in uncategorized if c.get('status')=='Resolved')
+ uncategorized_denied=sum(1 for c in uncategorized if c.get('status')=='Denied')
  uncategorized_pending=total_uncategorized-uncategorized_resolved-uncategorized_denied
  return render_template('admin_categories.html',tiles=tiles,total_uncategorized=total_uncategorized,uncategorized_pending=uncategorized_pending)
 @app.route('/admin/reports/<cat_key>')
 def admin_reports(cat_key):
  if not session.get('admin_logged_in'): return redirect(url_for('login'))
  if cat_key=='uncategorized':
-  q="SELECT c.*,u.username citizen_username FROM complaints c LEFT JOIN users u ON c.citizen_id=u.id WHERE c.category IS NULL OR c.category='' ORDER BY c.created_at DESC"
-  comps=[]
-  for x in rows(q):
-   d=dict(x); d['created_at']=parse_dt(d['created_at']); comps.append(d)
-  return render_template('admin.html',complaints=comps,cat_title='🗂️ Uncategorized',cat_key=cat_key)
- cat=CATEGORIES.get(cat_key)
- if not cat: return redirect(url_for('admin'))
- q='SELECT c.*,u.username citizen_username FROM complaints c LEFT JOIN users u ON c.citizen_id=u.id WHERE c.category=? ORDER BY c.created_at DESC'
- comps=[]
- for x in rows(q,(cat_key,)):
-  d=dict(x); d['created_at']=parse_dt(d['created_at']); comps.append(d)
- return render_template('admin.html',complaints=comps,cat_title=cat['icon']+' '+cat['title'],cat_key=cat_key)
+  comps=[_doc(d) for d in db.collection('complaints').stream()]
+  comps=[c for c in comps if not c.get('category')]
+  cat_title='🗂️ Uncategorized'
+ else:
+  cat=CATEGORIES.get(cat_key)
+  if not cat: return redirect(url_for('admin'))
+  comps=[_doc(d) for d in db.collection('complaints').where('category','==',cat_key).stream()]
+  cat_title=cat['icon']+' '+cat['title']
+ for c in comps: c['created_at']=parse_dt(c.get('created_at'))
+ comps.sort(key=lambda c:c['created_at'] or datetime.datetime.min,reverse=True)
+ return render_template('admin.html',complaints=comps,cat_title=cat_title,cat_key=cat_key)
 @app.route('/admin/report/<complaint_id>')
 def admin_report_detail(complaint_id):
  if not session.get('admin_logged_in'): return redirect(url_for('login'))
- x=one('SELECT c.*,u.username citizen_username FROM complaints c LEFT JOIN users u ON c.citizen_id=u.id WHERE c.id=?',(complaint_id,))
- if not x: return redirect(url_for('admin'))
- c=dict(x); c['created_at']=parse_dt(c['created_at'])
- citizen=one('SELECT * FROM users WHERE id=?',(c['citizen_id'],)) if c['citizen_id'] else None
+ c=_doc(db.collection('complaints').document(complaint_id).get())
+ if not c: return redirect(url_for('admin'))
+ c['created_at']=parse_dt(c.get('created_at'))
+ citizen=_doc(db.collection('users').document(c['citizen_id']).get()) if c.get('citizen_id') else None
  from_cat=request.args.get('from_cat','')
  back_url=url_for('admin_reports',cat_key=from_cat) if from_cat else url_for('admin')
  return render_template('admin_report_detail.html',c=c,citizen=citizen,back_url=back_url)
 @app.route('/admin/users')
 def admin_users():
  if not session.get('admin_logged_in'): return redirect(url_for('login'))
+ users=[_doc(d) for d in db.collection('users').stream()]
+ users.sort(key=lambda u:(u.get('username') or '').lower())
  out=[]
- for u in rows('SELECT * FROM users ORDER BY username'):
-  d=dict(u); d['badge_icon'],d['badge_name']=badge(d['points']); out.append(d)
+ for u in users:
+  u['badge_icon'],u['badge_name']=badge(u.get('points',0)); out.append(u)
  return render_template('admin_users.html',users=out)
 @app.route('/admin/delete-user/<user_id>',methods=['POST'])
-def admin_delete_user(user_id): run('DELETE FROM users WHERE id=?',(user_id,)); return redirect(url_for('admin_users'))
+def admin_delete_user(user_id):
+ if not session.get('admin_logged_in'): return redirect(url_for('login'))
+ db.collection('users').document(user_id).delete()
+ return redirect(url_for('admin_users'))
 @app.route('/update/<complaint_id>',methods=['POST'])
 def update_status(complaint_id):
  if not session.get('admin_logged_in'): return redirect(url_for('login'))
- s=request.form.get('status','Reported'); r=request.form.get('reason','').strip(); c=one('SELECT * FROM complaints WHERE id=?',(complaint_id,))
- cat_key=request.form.get('cat_key','')
- if c and s=='Resolved' and c['status']!='Resolved' and not c['points_awarded']:
-  run('UPDATE users SET points=points+10 WHERE id=?',(c['citizen_id'],)); run("UPDATE complaints SET status='Resolved',points_awarded=10 WHERE id=?",(complaint_id,))
- else: run('UPDATE complaints SET status=?,denial_reason=? WHERE id=?',(s,r if s=='Denied' else c['denial_reason'],complaint_id))
+ s=request.form.get('status','Reported'); r=request.form.get('reason','').strip(); cat_key=request.form.get('cat_key','')
+ ref=db.collection('complaints').document(complaint_id); c=_doc(ref.get())
+ if c and s=='Resolved' and c.get('status')!='Resolved' and not c.get('points_awarded'):
+  db.collection('users').document(c['citizen_id']).update({'points':firestore.Increment(10)})
+  ref.update({'status':'Resolved','points_awarded':10})
+ elif c:
+  ref.update({'status':s,'denial_reason':r if s=='Denied' else c.get('denial_reason','')})
  return redirect(url_for('admin_reports',cat_key=cat_key) if cat_key else url_for('admin'))
 @app.route('/delete/<complaint_id>',methods=['POST'])
 def delete_complaint(complaint_id):
  if not session.get('admin_logged_in'): return redirect(url_for('login'))
- cat_key=request.form.get('cat_key',''); run('DELETE FROM complaints WHERE id=?',(complaint_id,))
+ cat_key=request.form.get('cat_key',''); db.collection('complaints').document(complaint_id).delete()
  return redirect(url_for('admin_reports',cat_key=cat_key) if cat_key else url_for('admin'))
 @app.route('/paurigarhwal')
 def pauri_garhwal():
  return render_template('paurigarhwal.html')
 
 @app.route('/forgot-password',methods=['GET','POST'])
-def forgot_password(): flash('Password reset email is not configured for local SQLite mode.') if request.method=='POST' else None; return redirect(url_for('citizen_login')) if request.method=='POST' else render_template('forgot_password.html')
+def forgot_password(): flash('Password reset email is not configured yet.') if request.method=='POST' else None; return redirect(url_for('citizen_login')) if request.method=='POST' else render_template('forgot_password.html')
 @app.route('/reset-password/<token>',methods=['GET','POST'])
-def reset_password(token): flash('Password reset is unavailable in local mode.'); return redirect(url_for('forgot_password'))
+def reset_password(token): flash('Password reset is unavailable right now.'); return redirect(url_for('forgot_password'))
 if __name__=='__main__': app.run(debug=True)
