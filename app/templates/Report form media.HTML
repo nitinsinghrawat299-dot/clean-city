@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+{% block title %}{{ subcategory.title }} — SPR{% endblock %}
+
+{% block content %}
+<section style="padding:44px 0;">
+  <div class="wrap" style="max-width:640px;">
+    <a href="{{ url_for('report_category', cat_key=cat_key) }}" class="btn btn-ghost btn-sm" style="margin-bottom:18px;">← Back</a>
+
+    <div class="dash-header">
+      <h1>{{ category.icon }} {{ subcategory.title }}</h1>
+      <p>Attach a photo or video, pin the location, and optionally record a voice message.</p>
+    </div>
+
+    <form method="POST" action="{{ url_for('submit') }}" enctype="multipart/form-data" id="reportForm">
+      <input type="hidden" name="category" value="{{ cat_key }}">
+      <input type="hidden" name="subcategory" value="{{ sub_key }}">
+      <input type="hidden" name="coordinates" id="coordinates" value="">
+      <input type="file" name="audio" id="audioFileInput" style="display:none;">
+
+      <div class="card card-lg">
+
+        <div class="field">
+          <label>1. Attach a Photo or Video</label>
+          <div class="photo-capture" id="mediaCapture">
+            <img id="mediaPreviewImg" alt="Attached photo" style="display:none;">
+            <video id="mediaPreviewVid" controls style="display:none; width:100%; max-height:320px; border-radius:var(--radius-sm);"></video>
+            <div id="mediaPlaceholder" class="photo-placeholder">
+              <span style="font-size:2rem;">📷🎥</span>
+              <span>Tap below to choose a photo or record a video</span>
+            </div>
+          </div>
+          <input type="file" name="media" id="mediaInput" accept="image/*,video/*" capture="environment" required style="display:none;">
+          <div style="display:flex; gap:10px; margin-top:10px;">
+            <button type="button" class="btn btn-primary btn-sm" id="pickMediaBtn">📷 Choose Photo/Video</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="retakeMediaBtn" style="display:none;">↺ Remove</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>2. Pin Your Location</label>
+          <p class="field-note" id="locationStatus">No location pinned yet.</p>
+          <button type="button" class="btn btn-primary btn-sm" id="pinLocationBtn" style="margin-bottom:12px;">📍 Pin My Location</button>
+          <div id="reportMap" class="report-map" style="display:none;"></div>
+          <p class="field-note" id="mapError" style="display:none; color:var(--red-soft);"></p>
+        </div>
+
+        <div class="field" id="addressField" style="display:none;">
+          <label for="address">Address <span style="font-weight:400; color:var(--text-faint);">(auto-filled from your pin — edit if needed)</span></label>
+          <input type="text" id="address" name="address" placeholder="Address will appear here once you pin a location">
+        </div>
+
+        <div class="field">
+          <label>3. Voice Message <span style="font-weight:400; color:var(--text-faint);">(optional)</span></label>
+          <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <button type="button" class="btn btn-primary btn-sm" id="recordBtn">🎙️ Record Voice Message</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="stopBtn" style="display:none;">⏹ Stop</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="reRecordBtn" style="display:none;">↺ Re-record</button>
+          </div>
+          <audio id="audioPreview" controls style="display:none; margin-top:10px; width:100%;"></audio>
+          <p class="field-note" id="recordStatus"></p>
+        </div>
+
+        <div class="field">
+          <label for="description">Description <span style="font-weight:400; color:var(--text-faint);">(optional — the voice message can cover this)</span></label>
+          <textarea id="description" name="description" maxlength="1000" placeholder="Describe what you're reporting..."></textarea>
+        </div>
+
+        <div class="field">
+          <label for="location">Nearest Landmark <span style="font-weight:400; color:var(--text-faint);">(optional)</span></label>
+          <input type="text" id="location" name="location" placeholder="e.g. Near Bus Stand, Pauri">
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block" id="submitBtn" disabled>Submit Report</button>
+        <p class="field-note" id="submitHint" style="text-align:center; margin-top:10px;">Attach a photo/video and pin your location to enable submitting.</p>
+      </div>
+    </form>
+  </div>
+</section>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function(){
+  var mediaInput=document.getElementById('mediaInput');
+  var pickMediaBtn=document.getElementById('pickMediaBtn');
+  var retakeMediaBtn=document.getElementById('retakeMediaBtn');
+  var mediaPreviewImg=document.getElementById('mediaPreviewImg');
+  var mediaPreviewVid=document.getElementById('mediaPreviewVid');
+  var mediaPlaceholder=document.getElementById('mediaPlaceholder');
+  var pinLocationBtn=document.getElementById('pinLocationBtn');
+  var mapDiv=document.getElementById('reportMap');
+  var mapError=document.getElementById('mapError');
+  var locationStatus=document.getElementById('locationStatus');
+  var coordinatesInput=document.getElementById('coordinates');
+  var addressField=document.getElementById('addressField');
+  var addressInput=document.getElementById('address');
+  var submitBtn=document.getElementById('submitBtn');
+  var submitHint=document.getElementById('submitHint');
+  var recordBtn=document.getElementById('recordBtn');
+  var stopBtn=document.getElementById('stopBtn');
+  var reRecordBtn=document.getElementById('reRecordBtn');
+  var audioPreview=document.getElementById('audioPreview');
+  var recordStatus=document.getElementById('recordStatus');
+  var audioFileInput=document.getElementById('audioFileInput');
+  var map=null, marker=null, hasMedia=false, hasLocation=false;
+  var mediaRecorder=null, audioChunks=[];
+
+  function checkReady(){
+    if(hasMedia && hasLocation){ submitBtn.disabled=false; submitHint.style.display='none'; }
+    else { submitBtn.disabled=true; submitHint.style.display='block'; }
+  }
+
+  // ---------- Photo / video attach ----------
+  pickMediaBtn.addEventListener('click', function(){ mediaInput.click(); });
+
+  mediaInput.addEventListener('change', function(){
+    var f=this.files[0];
+    if(!f) return;
+    var url=URL.createObjectURL(f);
+    if(f.type.indexOf('video')===0){
+      mediaPreviewVid.src=url; mediaPreviewVid.style.display='block';
+      mediaPreviewImg.style.display='none';
+    } else {
+      mediaPreviewImg.src=url; mediaPreviewImg.style.display='block';
+      mediaPreviewVid.style.display='none';
+    }
+    mediaPlaceholder.style.display='none';
+    pickMediaBtn.style.display='none'; retakeMediaBtn.style.display='inline-flex';
+    hasMedia=true; checkReady();
+  });
+
+  retakeMediaBtn.addEventListener('click', function(){
+    mediaInput.value='';
+    mediaPreviewImg.style.display='none'; mediaPreviewVid.style.display='none'; mediaPreviewVid.src='';
+    mediaPlaceholder.style.display='flex';
+    pickMediaBtn.style.display='inline-flex'; retakeMediaBtn.style.display='none';
+    hasMedia=false; checkReady();
+  });
+
+  // ---------- Voice message recording ----------
+  recordBtn.addEventListener('click', function(){
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      recordStatus.textContent='Voice recording is not supported on this browser.'; return;
+    }
+    navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+      audioChunks=[];
+      mediaRecorder=new MediaRecorder(stream);
+      mediaRecorder.ondataavailable=function(e){ if(e.data.size>0) audioChunks.push(e.data); };
+      mediaRecorder.onstop=function(){
+        stream.getTracks().forEach(function(t){ t.stop(); });
+        var blob=new Blob(audioChunks, {type:'audio/webm'});
+        var file=new File([blob], 'voice-note.webm', {type:'audio/webm'});
+        var dt=new DataTransfer();
+        dt.items.add(file);
+        audioFileInput.files=dt.files;
+        var url=URL.createObjectURL(blob);
+        audioPreview.src=url; audioPreview.style.display='block';
+        recordBtn.style.display='none'; stopBtn.style.display='none'; reRecordBtn.style.display='inline-flex';
+        recordStatus.textContent='🎙️ Voice message recorded.';
+      };
+      mediaRecorder.start();
+      recordBtn.style.display='none'; stopBtn.style.display='inline-flex';
+      recordStatus.textContent='Recording… tap Stop when done.';
+    }).catch(function(){
+      recordStatus.textContent='Microphone access was denied — voice message skipped.';
+    });
+  });
+
+  stopBtn.addEventListener('click', function(){
+    if(mediaRecorder && mediaRecorder.state!=='inactive') mediaRecorder.stop();
+  });
+
+  reRecordBtn.addEventListener('click', function(){
+    audioFileInput.value='';
+    audioPreview.style.display='none'; audioPreview.src='';
+    recordBtn.style.display='inline-flex'; reRecordBtn.style.display='none';
+    recordStatus.textContent='';
+  });
+
+  // ---------- Location pin (same pattern as the standard report form) ----------
+  function reverseGeocode(lat,lng){
+    addressField.style.display='block';
+    addressInput.placeholder='Looking up address…';
+    fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat='+lat+'&lon='+lng, {
+      headers:{'Accept-Language':'en'}
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if(data && data.display_name){ addressInput.value = data.display_name; }
+      addressInput.placeholder='Address will appear here once you pin a location';
+    })
+    .catch(function(){
+      addressInput.placeholder='Could not auto-fill address — type it in manually.';
+    });
+  }
+
+  function dropPin(lat,lng){
+    coordinatesInput.value = lat+','+lng;
+    mapDiv.style.display='block';
+    mapError.style.display='none';
+    if(typeof L === 'undefined'){
+      mapError.textContent='⚠️ The map couldn\'t load (check your internet connection), but your location was still captured.';
+      mapError.style.display='block';
+      mapDiv.style.display='none';
+      hasLocation=true; checkReady();
+      reverseGeocode(lat,lng);
+      return;
+    }
+    try{
+      if(!map){
+        map=L.map('reportMap').setView([lat,lng],16);
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
+          maxZoom:19, attribution:'&copy; OpenStreetMap contributors'
+        }).addTo(map);
+        marker=L.marker([lat,lng],{draggable:true}).addTo(map);
+        marker.on('dragend', function(){
+          var p=marker.getLatLng();
+          coordinatesInput.value = p.lat.toFixed(6)+','+p.lng.toFixed(6);
+          locationStatus.textContent='📍 Location pinned — drag the marker to fine-tune.';
+          reverseGeocode(p.lat.toFixed(6),p.lng.toFixed(6));
+        });
+      } else {
+        map.setView([lat,lng],16);
+        marker.setLatLng([lat,lng]);
+      }
+      setTimeout(function(){ map.invalidateSize(); }, 200);
+    } catch(err){
+      mapError.textContent='⚠️ The map couldn\'t load, but your location was still captured.';
+      mapError.style.display='block';
+      mapDiv.style.display='none';
+    }
+    locationStatus.textContent='📍 Location pinned — drag the marker to fine-tune.';
+    reverseGeocode(lat,lng);
+    hasLocation=true; checkReady();
+  }
+
+  pinLocationBtn.addEventListener('click', function(){
+    if(!navigator.geolocation){
+      locationStatus.textContent='Geolocation is not supported on this device.';
+      return;
+    }
+    locationStatus.textContent='Getting your location…';
+    navigator.geolocation.getCurrentPosition(function(pos){
+      dropPin(pos.coords.latitude.toFixed(6), pos.coords.longitude.toFixed(6));
+    }, function(){
+      locationStatus.textContent='Could not get your location. Please enable location access and try again.';
+    }, {enableHighAccuracy:true, timeout:10000});
+  });
+})();
+</script>
+{% endblock %}

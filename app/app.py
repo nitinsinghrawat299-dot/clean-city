@@ -11,6 +11,7 @@ app=Flask(__name__); app.secret_key=os.getenv('SECRET_KEY','clean-city-local-sec
 app.jinja_env.globals['category_label']=lambda ck,sk: category_label(ck,sk)
 app.config['PERMANENT_SESSION_LIFETIME']=datetime.timedelta(days=14)
 ALLOWED={'png','jpg','jpeg','gif','webp'}
+ALLOWED_VIDEO={'mp4','mov','webm','mkv','3gp'}
 ADMIN_USERNAME=os.getenv('ADMIN_USERNAME','admin'); ADMIN_PASSWORD_HASH=os.getenv('ADMIN_PASSWORD_HASH','')
 
 # ---- Firebase / Firestore ----
@@ -34,7 +35,7 @@ CATEGORIES={
  'waste':{'title':'Waste & Garbage Management','icon':'🗑️','subcats':{
    'dirty-spot':{'title':'Cleanliness Target Unit (Dirty Spot)','enabled':True},
    'garbage-dump':{'title':'Garbage Dump','enabled':True},
-   'garbage-vehicle':{'title':'Garbage Vehicle Not Arrived','enabled':False},
+   'garbage-vehicle':{'title':'Garbage Vehicle Not Arrived','enabled':True,'requires_photo':False},
    'open-burning':{'title':'Burning of Garbage in Open Space','enabled':True},
    'sweeping':{'title':'Sweeping Not Done','enabled':True},
    'dustbins':{'title':'Dustbins Not Cleaned','enabled':True},
@@ -50,8 +51,8 @@ CATEGORIES={
  'toilet':{'title':'Public Toilet & Sanitation Issues','icon':'🚻','subcats':{
    'open-defecation':{'title':'Open Defecation','enabled':True},
    'yellow-spot':{'title':'Yellow Spot (Public Urination Spot)','enabled':True},
-   'no-electricity':{'title':'No Electricity in Public Toilet','enabled':False},
-   'no-water':{'title':'No Water Supply in Public Toilet','enabled':False},
+   'no-electricity':{'title':'No Electricity in Public Toilet','enabled':True},
+   'no-water':{'title':'No Water Supply in Public Toilet','enabled':True},
    'blockage':{'title':'Blockage in Public Toilet','enabled':True},
    'uncleaned':{'title':'Uncleaning Public Toilet','enabled':True},
    'fecal-disposal':{'title':'Improper Disposal of Fecal Waste / Septage','enabled':True},
@@ -61,7 +62,7 @@ CATEGORIES={
    'stagnant-water':{'title':'Stagnant Water on Road / Open Area','enabled':True},
    'septic-overflow':{'title':'Overflow of Septic Tanks','enabled':True},
    'dead-animal':{'title':'Removal of Dead Animals','enabled':True},
-   'other-complaint':{'title':'Complaint Other Citizen Make','enabled':False},
+   'other-complaint':{'title':'Complaint Other Citizen Make','enabled':True,'media_type':'photo_video_voice'},
  }},
 }
 def category_label(cat_key,sub_key):
@@ -81,12 +82,16 @@ def now_iso(): return datetime.datetime.utcnow().isoformat()
 def badge(points):
  return ('🌱','Green Starter') if points<20 else ('🌿','Eco Hero') if points<50 else ('🏆','Clean City Champion')
 def allowed(n): return '.' in n and n.rsplit('.',1)[1].lower() in ALLOWED
+def allowed_ext(n,exts): return '.' in n and n.rsplit('.',1)[1].lower() in exts
 def parse_dt(s):
  try: return datetime.datetime.fromisoformat(s) if s else None
  except Exception: return None
 def save_image(f):
  result=cloudinary.uploader.upload(f, folder='clean-city-reports')
  return result['secure_url']
+def save_media(f,folder='clean-city-reports'):
+ result=cloudinary.uploader.upload(f, folder=folder, resource_type='auto')
+ return result['secure_url'], result.get('resource_type','image')
 
 # ---- Site visit tracking (for the admin "Site Visits" widget) ----
 @app.before_request
@@ -136,6 +141,7 @@ def report_subcategory(cat_key,sub_key):
  sub=cat['subcats'].get(sub_key) if cat else None
  if not cat or not sub: return redirect(url_for('home'))
  if not sub['enabled']: return render_template('report_unavailable.html',cat_key=cat_key,category=cat,subcategory=sub)
+ if sub.get('media_type')=='photo_video_voice': return render_template('report_form_media.html',cat_key=cat_key,sub_key=sub_key,category=cat,subcategory=sub)
  return render_template('report_form.html',cat_key=cat_key,sub_key=sub_key,category=cat,subcategory=sub)
 @app.route('/register',methods=['GET','POST'])
 def register():
@@ -187,14 +193,26 @@ def submit():
  cat_key=request.form.get('category',''); sub_key=request.form.get('subcategory','')
  cat=CATEGORIES.get(cat_key); sub=cat['subcats'].get(sub_key) if cat else None
  if not cat or not sub or not sub['enabled']: flash('Please choose a valid, available complaint type.'); return redirect(url_for('home'))
- f=request.files.get('image')
- if not f or not f.filename or not allowed(f.filename): flash('Please upload a valid image.'); return redirect(url_for('report_subcategory',cat_key=cat_key,sub_key=sub_key))
- img=save_image(f)
+ img=''; media_type='image'; audio_url=''
+ if sub.get('media_type')=='photo_video_voice':
+  f=request.files.get('media')
+  if not f or not f.filename or not (allowed(f.filename) or allowed_ext(f.filename,ALLOWED_VIDEO)):
+   flash('Please attach a photo or video.'); return redirect(url_for('report_subcategory',cat_key=cat_key,sub_key=sub_key))
+  img,media_type=save_media(f)
+  a=request.files.get('audio')
+  if a and a.filename: audio_url,_=save_media(a,folder='clean-city-voice-notes')
+ elif not sub.get('requires_photo',True):
+  f=request.files.get('image')
+  if f and f.filename and allowed(f.filename): img=save_image(f)
+ else:
+  f=request.files.get('image')
+  if not f or not f.filename or not allowed(f.filename): flash('Please upload a valid image.'); return redirect(url_for('report_subcategory',cat_key=cat_key,sub_key=sub_key))
+  img=save_image(f)
  num=_count(db.collection('complaints'))+1; cid=uuid.uuid4().hex
  db.collection('complaints').document(cid).set({
   'report_number':num,'name':session.get('citizen_username','Citizen'),
   'description':request.form.get('description','')[:1000],'location':request.form.get('location',''),
-  'image':img,'status':'Reported','coordinates':request.form.get('coordinates',''),
+  'image':img,'media_type':media_type,'audio':audio_url,'status':'Reported','coordinates':request.form.get('coordinates',''),
   'address':request.form.get('address',''),'citizen_id':session['citizen_id'],
   'citizen_username':session.get('citizen_username','Citizen'),'points_awarded':0,'denial_reason':'',
   'created_at':now_iso(),'category':cat_key,'subcategory':sub_key,

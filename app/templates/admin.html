@@ -43,7 +43,9 @@
           <td>#{{ '%03d' % c.report_number if c.report_number else c.id[:6] }}</td>
           <td>
             <a href="{{ url_for('admin_report_detail', complaint_id=c.id, from_cat=cat_key) }}" style="display:flex; align-items:center; gap:8px; text-decoration:none; color:inherit;">
-              {% if c.image %}
+              {% if c.image and c.media_type == 'video' %}
+                <video src="{{ c.image }}" class="report-thumb-sm" muted style="object-fit:cover;"></video>
+              {% elif c.image %}
                 <img src="{{ c.image }}" alt="" class="report-thumb-sm">
               {% endif %}
               <span>{{ c.citizen_username or c.name or '—' }}</span>

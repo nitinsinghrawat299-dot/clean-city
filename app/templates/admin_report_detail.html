@@ -14,11 +14,17 @@
 <div class="review-grid">
   <!-- LEFT: photo + map -->
   <div class="card">
-    <h3 style="font-size:1rem; margin-bottom:12px;">Photo</h3>
-    {% if c.image %}
+    <h3 style="font-size:1rem; margin-bottom:12px;">{{ 'Video' if c.media_type == 'video' else 'Photo' }}</h3>
+    {% if c.image and c.media_type == 'video' %}
+      <video src="{{ c.image }}" controls class="review-photo"></video>
+    {% elif c.image %}
       <img src="{{ c.image }}" alt="Report photo" class="review-photo">
     {% else %}
       <div class="report-thumb report-thumb-empty" style="width:100%; height:260px; border-radius:12px;">No photo</div>
+    {% endif %}
+    {% if c.audio %}
+      <h3 style="font-size:1rem; margin:22px 0 12px;">🎙️ Voice Message</h3>
+      <audio src="{{ c.audio }}" controls style="width:100%;"></audio>
     {% endif %}
 
     <h3 style="font-size:1rem; margin:22px 0 12px;">Location</h3>

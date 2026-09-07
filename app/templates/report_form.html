@@ -18,6 +18,7 @@
 
       <div class="card card-lg">
 
+        {% if subcategory.get('requires_photo', True) %}
         <div class="field">
           <label>1. Take a Photo</label>
           <div class="photo-capture" id="photoCapture">
@@ -35,9 +36,10 @@
             <button type="button" class="btn btn-ghost btn-sm" id="retakeBtn" style="display:none;">↺ Retake</button>
           </div>
         </div>
+        {% endif %}
 
         <div class="field">
-          <label>2. Pin Your Location</label>
+          <label>{{ '2' if subcategory.get('requires_photo', True) else '1' }}. Pin Your Location</label>
           <p class="field-note" id="locationStatus">No location pinned yet.</p>
           <button type="button" class="btn btn-primary btn-sm" id="pinLocationBtn" style="margin-bottom:12px;">📍 Pin My Location</button>
           <div id="reportMap" class="report-map" style="display:none;"></div>
@@ -50,7 +52,7 @@
         </div>
 
         <div class="field">
-          <label for="description">3. Description</label>
+          <label for="description">{{ '3' if subcategory.get('requires_photo', True) else '2' }}. Description</label>
           <textarea id="description" name="description" required maxlength="1000" placeholder="Describe what you're reporting..."></textarea>
         </div>
 
@@ -87,7 +89,8 @@
   var locationInput=document.getElementById('location');
   var submitBtn=document.getElementById('submitBtn');
   var submitHint=document.getElementById('submitHint');
-  var map=null, marker=null, hasPhoto=false, hasLocation=false;
+  var photoRequired={{ 'true' if subcategory.get('requires_photo', True) else 'false' }};
+  var map=null, marker=null, hasPhoto=!photoRequired, hasLocation=false;
   var rawPhotoFile=null, lastLat=null, lastLng=null, lastAddress='';
 
   function checkReady(){
@@ -200,16 +203,16 @@
     });
   }
 
-  takePhotoBtn.addEventListener('click', function(){ imageInput.click(); });
+  takePhotoBtn && takePhotoBtn.addEventListener('click', function(){ imageInput.click(); });
 
-  imageInput.addEventListener('change', function(){
+  imageInput && imageInput.addEventListener('change', function(){
     var f=this.files[0];
     if(!f) return;
     rawPhotoFile=f;
     applyStamp(f);
   });
 
-  retakeBtn.addEventListener('click', function(){
+  retakeBtn && retakeBtn.addEventListener('click', function(){
     imageInput.value=''; rawPhotoFile=null;
     photoPreview.style.display='none'; photoPlaceholder.style.display='flex';
     takePhotoBtn.style.display='inline-flex'; retakeBtn.style.display='none';
