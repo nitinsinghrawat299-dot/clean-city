@@ -5,6 +5,7 @@ import cloudinary, cloudinary.uploader
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
+from translations import TRANSLATIONS
 
 load_dotenv(); BASE=os.path.dirname(os.path.abspath(__file__))
 app=Flask(__name__); app.secret_key=os.getenv('SECRET_KEY','clean-city-local-secret-change-me')
@@ -13,6 +14,23 @@ app.config['PERMANENT_SESSION_LIFETIME']=datetime.timedelta(days=14)
 ALLOWED={'png','jpg','jpeg','gif','webp'}
 ALLOWED_VIDEO={'mp4','mov','webm','mkv','3gp'}
 ADMIN_USERNAME=os.getenv('ADMIN_USERNAME','admin'); ADMIN_PASSWORD_HASH=os.getenv('ADMIN_PASSWORD_HASH','')
+
+# ---- Language / translation ----
+def get_lang(): return session.get('lang','en')
+def t(key): return TRANSLATIONS.get(get_lang(),TRANSLATIONS['en']).get(key,TRANSLATIONS['en'].get(key,key))
+app.jinja_env.globals['t']=t
+app.jinja_env.globals['get_lang']=get_lang
+app.jinja_env.globals['cat_t']=lambda ck: t('cat_'+ck)
+app.jinja_env.globals['sub_t']=lambda sk: t('sub_'+sk)
+app.jinja_env.globals['status_t']=lambda s: t('status_'+(s or '').lower().replace(' ','_'))
+@app.route('/set-language/<lang>')
+def set_language(lang):
+ if lang not in ('en','hi'): lang='en'
+ session['lang']=lang
+ if session.get('citizen_id'):
+  db.collection('users').document(session['citizen_id']).update({'language':lang})
+ dest=request.referrer or url_for('home')
+ return redirect(dest)
 
 # ---- Firebase / Firestore ----
 _cred_json=os.getenv('FIREBASE_SERVICE_ACCOUNT_JSON')
@@ -69,8 +87,8 @@ def category_label(cat_key,sub_key):
  cat=CATEGORIES.get(cat_key)
  if not cat: return ''
  sub=cat['subcats'].get(sub_key)
- if not sub: return cat['icon']+' '+cat['title']
- return cat['icon']+' '+sub['title']
+ if not sub: return cat['icon']+' '+t('cat_'+cat_key)
+ return cat['icon']+' '+t('sub_'+sub_key)
 
 # ---- Firestore helpers ----
 def _doc(snap):
@@ -140,7 +158,7 @@ def report_subcategory(cat_key,sub_key):
  cat=CATEGORIES.get(cat_key)
  sub=cat['subcats'].get(sub_key) if cat else None
  if not cat or not sub: return redirect(url_for('home'))
- if not sub['enabled']: return render_template('report_unavailable.html',cat_key=cat_key,category=cat,subcategory=sub)
+ if not sub['enabled']: return render_template('report_unavailable.html',cat_key=cat_key,sub_key=sub_key,category=cat,subcategory=sub)
  if sub.get('media_type')=='photo_video_voice': return render_template('report_form_media.html',cat_key=cat_key,sub_key=sub_key,category=cat,subcategory=sub)
  return render_template('report_form.html',cat_key=cat_key,sub_key=sub_key,category=cat,subcategory=sub)
 @app.route('/register',methods=['GET','POST'])
@@ -152,8 +170,10 @@ def register():
   dup_u=next(db.collection('users').where('username','==',u).limit(1).stream(),None)
   dup_e=next(db.collection('users').where('email','==',e).limit(1).stream(),None)
   if dup_u or dup_e: flash('Username or email already exists.'); return redirect(url_for('register'))
-  uid=uuid.uuid4().hex
-  db.collection('users').document(uid).set({'username':u,'email':e,'password':generate_password_hash(p),'points':0,'reset_token':None,'reset_token_expires':None,'created_at':now_iso()})
+  uid=uuid.uuid4().hex; lang=request.form.get('language','en')
+  if lang not in ('en','hi'): lang='en'
+  db.collection('users').document(uid).set({'username':u,'email':e,'password':generate_password_hash(p),'points':0,'reset_token':None,'reset_token_expires':None,'created_at':now_iso(),'language':lang})
+  session['lang']=lang
   session['prefill_username']=u; session['prefill_password']=p; flash('Account created!'); return redirect(url_for('citizen_login'))
  return render_template('register.html')
 @app.route('/citizen-login',methods=['GET','POST'])
@@ -162,7 +182,9 @@ def citizen_login():
   u=request.form.get('username','').strip(); p=request.form.get('password','')
   snap=next(db.collection('users').where('username','==',u).limit(1).stream(),None)
   x=_doc(snap) if snap else None
-  if x and check_password_hash(x['password'],p): session.permanent=True; session['citizen_id']=x['id']; session['citizen_username']=x['username']; return redirect(url_for('home'))
+  if x and check_password_hash(x['password'],p):
+   session.permanent=True; session['citizen_id']=x['id']; session['citizen_username']=x['username']; session['lang']=x.get('language','en')
+   return redirect(url_for('home'))
   flash('Incorrect username or password.')
  return render_template('citizen_login.html',prefill_username=session.pop('prefill_username',''),prefill_password=session.pop('prefill_password',''))
 @app.route('/citizen-logout')
@@ -232,7 +254,7 @@ def admin():
  for cat_key,cat in CATEGORIES.items():
   base=db.collection('complaints').where('category','==',cat_key)
   total=_count(base); resolved=_count(base.where('status','==','Resolved')); denied=_count(base.where('status','==','Denied'))
-  tiles.append({'cat_key':cat_key,'icon':cat['icon'],'title':cat['title'],'pending':total-resolved-denied})
+  tiles.append({'cat_key':cat_key,'icon':cat['icon'],'title':t('cat_'+cat_key),'pending':total-resolved-denied})
  all_complaints=[d.to_dict() or {} for d in db.collection('complaints').stream()]
  uncategorized=[c for c in all_complaints if not c.get('category')]
  total_uncategorized=len(uncategorized)
@@ -246,12 +268,12 @@ def admin_reports(cat_key):
  if cat_key=='uncategorized':
   comps=[_doc(d) for d in db.collection('complaints').stream()]
   comps=[c for c in comps if not c.get('category')]
-  cat_title='🗂️ Uncategorized'
+  cat_title='🗂️ '+t('uncategorized')
  else:
   cat=CATEGORIES.get(cat_key)
   if not cat: return redirect(url_for('admin'))
   comps=[_doc(d) for d in db.collection('complaints').where('category','==',cat_key).stream()]
-  cat_title=cat['icon']+' '+cat['title']
+  cat_title=cat['icon']+' '+t('cat_'+cat_key)
  for c in comps: c['created_at']=parse_dt(c.get('created_at'))
  comps.sort(key=lambda c:c['created_at'] or datetime.datetime.min,reverse=True)
  return render_template('admin.html',complaints=comps,cat_title=cat_title,cat_key=cat_key)
