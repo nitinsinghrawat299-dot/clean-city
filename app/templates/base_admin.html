@@ -6,7 +6,7 @@
 <title>{% block title %}SPR Admin{% endblock %}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
@@ -14,13 +14,13 @@
 <div class="admin-shell">
   <aside class="admin-sidebar">
     <div class="logo">
-      <span class="logo-mark">🌱</span>
+      <span class="logo-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M3 19h18"/><path d="M5 19 11 6l3 5.5"/><path d="M11 19 15.5 9 21 19"/><circle cx="15.5" cy="6.2" r="1.15" fill="currentColor" stroke="none"/></svg></span>
       <span>SPR<small>Municipality</small></span>
     </div>
     <nav class="admin-nav">
-      <a href="{{ url_for('admin') }}" class="{{ 'active' if request.endpoint == 'admin' }}">📋 {{ t('admin_reports') }}</a>
-      <a href="{{ url_for('admin_users') }}" class="{{ 'active' if request.endpoint == 'admin_users' }}">👥 {{ t('admin_citizens') }}</a>
-      <a href="{{ url_for('leaderboard') }}">🏆 {{ t('admin_leaderboard') }}</a>
+      <a href="{{ url_for('admin') }}" class="{{ 'active' if request.endpoint == 'admin' }}">{{ t('admin_reports') }}</a>
+      <a href="{{ url_for('admin_users') }}" class="{{ 'active' if request.endpoint == 'admin_users' }}">{{ t('admin_citizens') }}</a>
+      <a href="{{ url_for('leaderboard') }}">{{ t('admin_leaderboard') }}</a>
     </nav>
     <a href="{{ url_for('set_language', lang='hi' if get_lang()=='en' else 'en') }}" class="btn btn-ghost btn-block btn-sm" style="margin-bottom:8px;">🌐 {{ t('lang_toggle') }}</a>
     <a href="{{ url_for('logout') }}" class="btn btn-ghost btn-block btn-sm">{{ t('nav_logout') }}</a>

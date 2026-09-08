@@ -6,7 +6,7 @@
 <title>{% block title %}SPR — Snap Pin Report{% endblock %}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 {% block extra_head %}{% endblock %}
 </head>
@@ -16,7 +16,7 @@
 <header class="site-header">
   <nav class="site-nav">
     <a href="{{ url_for('home') }}" class="logo">
-      <span class="logo-mark">🌱</span>
+      <span class="logo-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M3 19h18"/><path d="M5 19 11 6l3 5.5"/><path d="M11 19 15.5 9 21 19"/><circle cx="15.5" cy="6.2" r="1.15" fill="currentColor" stroke="none"/></svg></span>
       <span>SPR<small>Snap Pin Report</small></span>
     </a>
     <div class="nav-links">
@@ -62,7 +62,7 @@
     <div class="footer-grid">
       <div>
         <div class="logo" style="margin-bottom:10px;">
-          <span class="logo-mark">🌱</span>
+          <span class="logo-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M3 19h18"/><path d="M5 19 11 6l3 5.5"/><path d="M11 19 15.5 9 21 19"/><circle cx="15.5" cy="6.2" r="1.15" fill="currentColor" stroke="none"/></svg></span>
           <span>SPR<small>Snap Pin Report</small></span>
         </div>
         <p style="color:var(--text-muted); font-size:.88rem; max-width:280px;">{{ t('footer_tagline') }}</p>
