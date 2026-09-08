@@ -34,8 +34,13 @@ def set_language(lang):
 
 # ---- Firebase / Firestore ----
 _cred_json=os.getenv('FIREBASE_SERVICE_ACCOUNT_JSON')
-if _cred_json and not firebase_admin._apps:
- firebase_admin.initialize_app(credentials.Certificate(json.loads(_cred_json)))
+if not firebase_admin._apps:
+ if _cred_json:
+  firebase_admin.initialize_app(credentials.Certificate(json.loads(_cred_json)))
+ else:
+  # No JSON in env: fall back to Application Default Credentials.
+  # This is what Cloud Run's built-in service account provides automatically.
+  firebase_admin.initialize_app()
 db=firestore.client()
 
 # ---- Cloudinary ----
