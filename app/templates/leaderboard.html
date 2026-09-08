@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Leaderboard — SPR{% endblock %}
+{% block title %}{{ t('leaderboard_title') }} — SPR{% endblock %}
 
 {% block content %}
 <section style="padding:44px 0;">
   <div class="wrap">
     <div class="dash-header">
-      <h1>🏆 Leaderboard</h1>
-      <p>Top contributors making {{ "our" }} city cleaner.</p>
+      <h1>🏆 {{ t('leaderboard_title') }}</h1>
+      <p>{{ t('leaderboard_lede') }}</p>
     </div>
 
     <div class="card" style="padding:8px 8px 20px;">
@@ -14,10 +14,10 @@
         <table class="lb-table">
           <thead>
             <tr>
-              <th>Rank</th>
-              <th>User</th>
-              <th>Badge</th>
-              <th>Points</th>
+              <th>{{ t('rank') }}</th>
+              <th>{{ t('lb_col_user') }}</th>
+              <th>{{ t('badge') }}</th>
+              <th>{{ t('lb_col_points') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -27,14 +27,14 @@
                 <td>
                   <div class="lb-user">
                     <span class="lb-avatar">{{ u.username[:1] | upper }}</span>
-                    <span>{{ u.username }}{% if session.get('citizen_username') == u.username %} (you){% endif %}</span>
+                    <span>{{ u.username }}{% if session.get('citizen_username') == u.username %} {{ t('lb_you') }}{% endif %}</span>
                   </div>
                 </td>
                 <td>{{ u.icon }} {{ u.badge }}</td>
-                <td><strong>{{ u.points }}</strong> pts</td>
+                <td><strong>{{ u.points }}</strong> {{ t('lb_pts') }}</td>
               </tr>
             {% else %}
-              <tr><td colspan="4" class="empty-state">No citizens on the leaderboard yet — be the first to report an issue!</td></tr>
+              <tr><td colspan="4" class="empty-state">{{ t('lb_empty') }}</td></tr>
             {% endfor %}
           </tbody>
         </table>

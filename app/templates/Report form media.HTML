@@ -1,14 +1,14 @@
 {% extends "base.html" %}
-{% block title %}{{ subcategory.title }} — SPR{% endblock %}
+{% block title %}{{ sub_t(sub_key) }} — SPR{% endblock %}
 
 {% block content %}
 <section style="padding:44px 0;">
   <div class="wrap" style="max-width:640px;">
-    <a href="{{ url_for('report_category', cat_key=cat_key) }}" class="btn btn-ghost btn-sm" style="margin-bottom:18px;">← Back</a>
+    <a href="{{ url_for('report_category', cat_key=cat_key) }}" class="btn btn-ghost btn-sm" style="margin-bottom:18px;">← {{ t('back') }}</a>
 
     <div class="dash-header">
-      <h1>{{ category.icon }} {{ subcategory.title }}</h1>
-      <p>Attach a photo or video, pin the location, and optionally record a voice message.</p>
+      <h1>{{ category.icon }} {{ sub_t(sub_key) }}</h1>
+      <p>{{ t('media_form_lede') }}</p>
     </div>
 
     <form method="POST" action="{{ url_for('submit') }}" enctype="multipart/form-data" id="reportForm">
@@ -20,58 +20,58 @@
       <div class="card card-lg">
 
         <div class="field">
-          <label>1. Attach a Photo or Video</label>
+          <label>1. {{ t('step_media') }}</label>
           <div class="photo-capture" id="mediaCapture">
             <img id="mediaPreviewImg" alt="Attached photo" style="display:none;">
             <video id="mediaPreviewVid" controls style="display:none; width:100%; max-height:320px; border-radius:var(--radius-sm);"></video>
             <div id="mediaPlaceholder" class="photo-placeholder">
               <span style="font-size:2rem;">📷🎥</span>
-              <span>Tap below to choose a photo or record a video</span>
+              <span>{{ t('media_placeholder') }}</span>
             </div>
           </div>
           <input type="file" name="media" id="mediaInput" accept="image/*,video/*" capture="environment" required style="display:none;">
           <div style="display:flex; gap:10px; margin-top:10px;">
-            <button type="button" class="btn btn-primary btn-sm" id="pickMediaBtn">📷 Choose Photo/Video</button>
-            <button type="button" class="btn btn-ghost btn-sm" id="retakeMediaBtn" style="display:none;">↺ Remove</button>
+            <button type="button" class="btn btn-primary btn-sm" id="pickMediaBtn">{{ t('choose_media_btn') }}</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="retakeMediaBtn" style="display:none;">{{ t('remove_media_btn') }}</button>
           </div>
         </div>
 
         <div class="field">
-          <label>2. Pin Your Location</label>
-          <p class="field-note" id="locationStatus">No location pinned yet.</p>
-          <button type="button" class="btn btn-primary btn-sm" id="pinLocationBtn" style="margin-bottom:12px;">📍 Pin My Location</button>
+          <label>2. {{ t('step_location') }}</label>
+          <p class="field-note" id="locationStatus">{{ t('no_location_pinned') }}</p>
+          <button type="button" class="btn btn-primary btn-sm" id="pinLocationBtn" style="margin-bottom:12px;">{{ t('pin_my_location') }}</button>
           <div id="reportMap" class="report-map" style="display:none;"></div>
           <p class="field-note" id="mapError" style="display:none; color:var(--red-soft);"></p>
         </div>
 
         <div class="field" id="addressField" style="display:none;">
-          <label for="address">Address <span style="font-weight:400; color:var(--text-faint);">(auto-filled from your pin — edit if needed)</span></label>
-          <input type="text" id="address" name="address" placeholder="Address will appear here once you pin a location">
+          <label for="address">{{ t('address_label') }} <span style="font-weight:400; color:var(--text-faint);">{{ t('address_hint') }}</span></label>
+          <input type="text" id="address" name="address" placeholder="{{ t('address_placeholder') }}">
         </div>
 
         <div class="field">
-          <label>3. Voice Message <span style="font-weight:400; color:var(--text-faint);">(optional)</span></label>
+          <label>3. {{ t('step_voice') }} <span style="font-weight:400; color:var(--text-faint);">{{ t('optional') }}</span></label>
           <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-            <button type="button" class="btn btn-primary btn-sm" id="recordBtn">🎙️ Record Voice Message</button>
-            <button type="button" class="btn btn-ghost btn-sm" id="stopBtn" style="display:none;">⏹ Stop</button>
-            <button type="button" class="btn btn-ghost btn-sm" id="reRecordBtn" style="display:none;">↺ Re-record</button>
+            <button type="button" class="btn btn-primary btn-sm" id="recordBtn">{{ t('record_voice') }}</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="stopBtn" style="display:none;">{{ t('stop_recording') }}</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="reRecordBtn" style="display:none;">{{ t('re_record') }}</button>
           </div>
           <audio id="audioPreview" controls style="display:none; margin-top:10px; width:100%;"></audio>
           <p class="field-note" id="recordStatus"></p>
         </div>
 
         <div class="field">
-          <label for="description">Description <span style="font-weight:400; color:var(--text-faint);">(optional — the voice message can cover this)</span></label>
-          <textarea id="description" name="description" maxlength="1000" placeholder="Describe what you're reporting..."></textarea>
+          <label for="description">{{ t('step_description') }} <span style="font-weight:400; color:var(--text-faint);">{{ t('description_optional_hint') }}</span></label>
+          <textarea id="description" name="description" maxlength="1000" placeholder="{{ t('description_placeholder') }}"></textarea>
         </div>
 
         <div class="field">
-          <label for="location">Nearest Landmark <span style="font-weight:400; color:var(--text-faint);">(optional)</span></label>
-          <input type="text" id="location" name="location" placeholder="e.g. Near Bus Stand, Pauri">
+          <label for="location">{{ t('landmark_label') }} <span style="font-weight:400; color:var(--text-faint);">{{ t('optional') }}</span></label>
+          <input type="text" id="location" name="location" placeholder="{{ t('landmark_placeholder') }}">
         </div>
 
-        <button type="submit" class="btn btn-primary btn-block" id="submitBtn" disabled>Submit Report</button>
-        <p class="field-note" id="submitHint" style="text-align:center; margin-top:10px;">Attach a photo/video and pin your location to enable submitting.</p>
+        <button type="submit" class="btn btn-primary btn-block" id="submitBtn" disabled>{{ t('submit_report') }}</button>
+        <p class="field-note" id="submitHint" style="text-align:center; margin-top:10px;">{{ t('submit_hint_media') }}</p>
       </div>
     </form>
   </div>
@@ -80,6 +80,21 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+var I18N={
+  lookingUpAddress:{{ t('looking_up_address')|tojson }},
+  couldNotAutofill:{{ t('could_not_autofill_address')|tojson }},
+  mapLoadError1:{{ t('map_load_error_1')|tojson }},
+  mapLoadError2:{{ t('map_load_error_2')|tojson }},
+  locationPinnedDrag:{{ t('location_pinned')|tojson }},
+  geoNotSupported:{{ t('geolocation_not_supported')|tojson }},
+  gettingLocation:{{ t('getting_location')|tojson }},
+  locationError:{{ t('location_error')|tojson }},
+  addressPlaceholder:{{ t('address_placeholder')|tojson }},
+  voiceMicNotSupported:{{ t('voice_mic_not_supported')|tojson }},
+  micDenied:{{ t('mic_denied')|tojson }},
+  voiceRecorded:{{ t('voice_recorded')|tojson }},
+  recordingInProgress:{{ t('recording_in_progress')|tojson }}
+};
 (function(){
   var mediaInput=document.getElementById('mediaInput');
   var pickMediaBtn=document.getElementById('pickMediaBtn');
@@ -140,7 +155,7 @@
   // ---------- Voice message recording ----------
   recordBtn.addEventListener('click', function(){
     if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-      recordStatus.textContent='Voice recording is not supported on this browser.'; return;
+      recordStatus.textContent=I18N.voiceMicNotSupported; return;
     }
     navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
       audioChunks=[];
@@ -156,13 +171,13 @@
         var url=URL.createObjectURL(blob);
         audioPreview.src=url; audioPreview.style.display='block';
         recordBtn.style.display='none'; stopBtn.style.display='none'; reRecordBtn.style.display='inline-flex';
-        recordStatus.textContent='🎙️ Voice message recorded.';
+        recordStatus.textContent=I18N.voiceRecorded;
       };
       mediaRecorder.start();
       recordBtn.style.display='none'; stopBtn.style.display='inline-flex';
-      recordStatus.textContent='Recording… tap Stop when done.';
+      recordStatus.textContent=I18N.recordingInProgress;
     }).catch(function(){
-      recordStatus.textContent='Microphone access was denied — voice message skipped.';
+      recordStatus.textContent=I18N.micDenied;
     });
   });
 
@@ -180,17 +195,17 @@
   // ---------- Location pin (same pattern as the standard report form) ----------
   function reverseGeocode(lat,lng){
     addressField.style.display='block';
-    addressInput.placeholder='Looking up address…';
+    addressInput.placeholder=I18N.lookingUpAddress;
     fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat='+lat+'&lon='+lng, {
       headers:{'Accept-Language':'en'}
     })
     .then(function(r){ return r.json(); })
     .then(function(data){
       if(data && data.display_name){ addressInput.value = data.display_name; }
-      addressInput.placeholder='Address will appear here once you pin a location';
+      addressInput.placeholder=I18N.addressPlaceholder;
     })
     .catch(function(){
-      addressInput.placeholder='Could not auto-fill address — type it in manually.';
+      addressInput.placeholder=I18N.couldNotAutofill;
     });
   }
 
@@ -199,7 +214,7 @@
     mapDiv.style.display='block';
     mapError.style.display='none';
     if(typeof L === 'undefined'){
-      mapError.textContent='⚠️ The map couldn\'t load (check your internet connection), but your location was still captured.';
+      mapError.textContent=I18N.mapLoadError1;
       mapError.style.display='block';
       mapDiv.style.display='none';
       hasLocation=true; checkReady();
@@ -216,7 +231,7 @@
         marker.on('dragend', function(){
           var p=marker.getLatLng();
           coordinatesInput.value = p.lat.toFixed(6)+','+p.lng.toFixed(6);
-          locationStatus.textContent='📍 Location pinned — drag the marker to fine-tune.';
+          locationStatus.textContent=I18N.locationPinnedDrag;
           reverseGeocode(p.lat.toFixed(6),p.lng.toFixed(6));
         });
       } else {
@@ -225,25 +240,25 @@
       }
       setTimeout(function(){ map.invalidateSize(); }, 200);
     } catch(err){
-      mapError.textContent='⚠️ The map couldn\'t load, but your location was still captured.';
+      mapError.textContent=I18N.mapLoadError2;
       mapError.style.display='block';
       mapDiv.style.display='none';
     }
-    locationStatus.textContent='📍 Location pinned — drag the marker to fine-tune.';
+    locationStatus.textContent=I18N.locationPinnedDrag;
     reverseGeocode(lat,lng);
     hasLocation=true; checkReady();
   }
 
   pinLocationBtn.addEventListener('click', function(){
     if(!navigator.geolocation){
-      locationStatus.textContent='Geolocation is not supported on this device.';
+      locationStatus.textContent=I18N.geoNotSupported;
       return;
     }
-    locationStatus.textContent='Getting your location…';
+    locationStatus.textContent=I18N.gettingLocation;
     navigator.geolocation.getCurrentPosition(function(pos){
       dropPin(pos.coords.latitude.toFixed(6), pos.coords.longitude.toFixed(6));
     }, function(){
-      locationStatus.textContent='Could not get your location. Please enable location access and try again.';
+      locationStatus.textContent=I18N.locationError;
     }, {enableHighAccuracy:true, timeout:10000});
   });
 })();

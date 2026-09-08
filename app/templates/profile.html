@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}My Profile — SPR{% endblock %}
+{% block title %}{{ t('profile_title') }} — SPR{% endblock %}
 
 {% block content %}
 <section style="padding:44px 0;">
@@ -11,6 +11,7 @@
         <div style="flex:1; min-width:200px;">
           <div class="profile-name">{{ user.username }}</div>
           <div class="profile-meta">{{ user.email }}</div>
+          <a href="{{ url_for('set_language', lang='hi' if get_lang()=='en' else 'en') }}" class="btn btn-ghost btn-sm" style="margin-top:8px;">🌐 {{ t('change_language') }} ({{ t('lang_toggle') }})</a>
         </div>
         <div style="text-align:center;">
           <div class="ic" style="font-size:2rem;">{{ badge_icon }}</div>
@@ -20,21 +21,23 @@
     </div>
 
     <div class="stat-row">
-      <div class="stat-chip"><div class="num">{{ user.points | default(0) }}</div><div class="label">Total Points</div></div>
-      <div class="stat-chip"><div class="num">{{ total }}</div><div class="label">Reports Submitted</div></div>
-      <div class="stat-chip"><div class="num">{{ resolved }}</div><div class="label">Reports Resolved</div></div>
-      <div class="stat-chip"><div class="num">{{ total - resolved }}</div><div class="label">Still Pending</div></div>
+      <div class="stat-chip"><div class="num">{{ user.points | default(0) }}</div><div class="label">{{ t('total_points') }}</div></div>
+      <div class="stat-chip"><div class="num">{{ total }}</div><div class="label">{{ t('reports_submitted') }}</div></div>
+      <div class="stat-chip"><div class="num">{{ resolved }}</div><div class="label">{{ t('reports_resolved') }}</div></div>
+      <div class="stat-chip"><div class="num">{{ total - resolved }}</div><div class="label">{{ t('still_pending') }}</div></div>
     </div>
 
     <div class="dash-grid">
       <div class="card">
-        <h3 style="font-size:1.1rem; margin-bottom:18px;">My Reports</h3>
+        <h3 style="font-size:1.1rem; margin-bottom:18px;">{{ t('my_reports') }}</h3>
 
         {% if complaints %}
           <div class="activity-list">
             {% for c in complaints %}
               <div class="activity-item">
-                {% if c.image %}
+                {% if c.image and c.media_type == 'video' %}
+                  <video src="{{ c.image }}" class="activity-thumb" muted></video>
+                {% elif c.image %}
                   <img src="{{ c.image }}" class="activity-thumb" alt="Report photo">
                 {% else %}
                   <div class="activity-thumb"></div>
@@ -44,7 +47,7 @@
                   <h4>{{ c.description[:80] }}{{ '…' if c.description|length > 80 }}</h4>
                   <p>📍 {{ c.location }}{% if c.address %} · {{ c.address }}{% endif %}</p>
                   {% if c.status == 'Denied' and c.denial_reason %}
-                    <p style="color:#ff9a9d;">Denied: {{ c.denial_reason }}</p>
+                    <p style="color:#ff9a9d;">{{ t('denied_label') }}: {{ c.denial_reason }}</p>
                   {% endif %}
                 </div>
                 <span class="status status-{{ c.status | lower | replace(' ', '') }}">{{ c.status }}</span>
@@ -54,33 +57,33 @@
         {% else %}
           <div class="empty-state">
             <div class="ic">🌱</div>
-            <p>You haven't submitted any reports yet.</p>
-            <a href="{{ url_for('home') }}" class="btn btn-primary" style="margin-top:14px;">Report an Issue</a>
+            <p>{{ t('no_reports_yet') }}</p>
+            <a href="{{ url_for('home') }}" class="btn btn-primary" style="margin-top:14px;">{{ t('report_an_issue') }}</a>
           </div>
         {% endif %}
       </div>
 
       <div style="display:flex; flex-direction:column; gap:20px;">
         <div class="card">
-          <h3 style="font-size:1.05rem; margin-bottom:6px;">Current Badge</h3>
+          <h3 style="font-size:1.05rem; margin-bottom:6px;">{{ t('current_badge') }}</h3>
           <div class="achv-grid">
             <div class="achv-card">
               <div class="ic">{{ badge_icon }}</div>
               <h5>{{ badge_name }}</h5>
-              <p>{{ user.points | default(0) }} pts</p>
+              <p>{{ user.points | default(0) }} {{ t('pts_suffix') }}</p>
             </div>
           </div>
         </div>
 
         <div class="card" style="border-color:rgba(229,72,77,.25);">
-          <h3 style="font-size:1rem; margin-bottom:8px; color:#ff9a9d;">Delete Account</h3>
-          <p style="color:var(--text-muted); font-size:.85rem; margin-bottom:14px;">This permanently deletes your account. This cannot be undone.</p>
+          <h3 style="font-size:1rem; margin-bottom:8px; color:#ff9a9d;">{{ t('delete_account') }}</h3>
+          <p style="color:var(--text-muted); font-size:.85rem; margin-bottom:14px;">{{ t('delete_account_warning') }}</p>
           <form method="POST" action="{{ url_for('delete_account') }}" onsubmit="return confirm('Are you sure? This cannot be undone.');">
             <div class="field">
-              <label for="delete_password">Confirm your password</label>
-              <input type="password" id="delete_password" name="password" required placeholder="Enter your password">
+              <label for="delete_password">{{ t('confirm_your_password') }}</label>
+              <input type="password" id="delete_password" name="password" required placeholder="{{ t('password_label') }}">
             </div>
-            <button type="submit" class="btn btn-danger btn-block">Delete My Account</button>
+            <button type="submit" class="btn btn-danger btn-block">{{ t('delete_my_account') }}</button>
           </form>
         </div>
       </div>

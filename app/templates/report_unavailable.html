@@ -1,16 +1,16 @@
 {% extends "base.html" %}
-{% block title %}{{ subcategory.title }} — SPR{% endblock %}
+{% block title %}{{ sub_t(sub_key) }} — SPR{% endblock %}
 
 {% block content %}
 <section style="padding:44px 0;">
   <div class="wrap">
-    <a href="{{ url_for('report_category', cat_key=cat_key) }}" class="btn btn-ghost btn-sm" style="margin-bottom:18px;">← Back to {{ category.title }}</a>
+    <a href="{{ url_for('report_category', cat_key=cat_key) }}" class="btn btn-ghost btn-sm" style="margin-bottom:18px;">{{ t('back_to') }} {{ cat_t(cat_key) }}</a>
 
     <div class="card card-lg" style="text-align:center; padding:60px 30px;">
       <div style="font-size:2.4rem; margin-bottom:14px;">{{ category.icon }}</div>
-      <h2 style="margin-bottom:10px;">{{ subcategory.title }}</h2>
-      <p style="color:var(--text-muted); max-width:420px; margin:0 auto;">Reporting for this issue type isn't available yet. Please check back soon, or report a different issue in the meantime.</p>
-      <a href="{{ url_for('report_category', cat_key=cat_key) }}" class="btn btn-primary" style="margin-top:22px;">Choose Another Issue</a>
+      <h2 style="margin-bottom:10px;">{{ sub_t(sub_key) }}</h2>
+      <p style="color:var(--text-muted); max-width:420px; margin:0 auto;">{{ t('report_unavailable_body2') }}</p>
+      <a href="{{ url_for('report_category', cat_key=cat_key) }}" class="btn btn-primary" style="margin-top:22px;">{{ t('choose_another_issue') }}</a>
     </div>
   </div>
 </section>

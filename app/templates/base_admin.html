@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ get_lang() }}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -18,11 +18,12 @@
       <span>SPR<small>Municipality</small></span>
     </div>
     <nav class="admin-nav">
-      <a href="{{ url_for('admin') }}" class="{{ 'active' if request.endpoint == 'admin' }}">📋 Reports</a>
-      <a href="{{ url_for('admin_users') }}" class="{{ 'active' if request.endpoint == 'admin_users' }}">👥 Citizens</a>
-      <a href="{{ url_for('leaderboard') }}">🏆 Leaderboard</a>
+      <a href="{{ url_for('admin') }}" class="{{ 'active' if request.endpoint == 'admin' }}">📋 {{ t('admin_reports') }}</a>
+      <a href="{{ url_for('admin_users') }}" class="{{ 'active' if request.endpoint == 'admin_users' }}">👥 {{ t('admin_citizens') }}</a>
+      <a href="{{ url_for('leaderboard') }}">🏆 {{ t('admin_leaderboard') }}</a>
     </nav>
-    <a href="{{ url_for('logout') }}" class="btn btn-ghost btn-block btn-sm">Logout</a>
+    <a href="{{ url_for('set_language', lang='hi' if get_lang()=='en' else 'en') }}" class="btn btn-ghost btn-block btn-sm" style="margin-bottom:8px;">🌐 {{ t('lang_toggle') }}</a>
+    <a href="{{ url_for('logout') }}" class="btn btn-ghost btn-block btn-sm">{{ t('nav_logout') }}</a>
   </aside>
 
   <div class="admin-main">
@@ -30,13 +31,13 @@
       <div class="card" style="padding:14px 20px; display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
         <div style="text-align:center; min-width:70px;">
           <div class="num" id="visitorCount" style="font-size:1.5rem; font-weight:800; color:var(--green-700, #126b3c); line-height:1;">{{ visit_stats.today }}</div>
-          <div style="font-size:.7rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; margin-top:2px;">👁 Site Visits</div>
+          <div style="font-size:.7rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; margin-top:2px;">👁 {{ t('site_visits') }}</div>
         </div>
         <div style="display:flex; gap:6px; flex-wrap:wrap;">
-          <button type="button" class="pill active" data-count="{{ visit_stats.today }}">Today</button>
-          <button type="button" class="pill" data-count="{{ visit_stats.week }}">Last 7 Days</button>
-          <button type="button" class="pill" data-count="{{ visit_stats.month }}">Last 30 Days</button>
-          <button type="button" class="pill" data-count="{{ visit_stats.all }}">All Time</button>
+          <button type="button" class="pill active" data-count="{{ visit_stats.today }}">{{ t('today') }}</button>
+          <button type="button" class="pill" data-count="{{ visit_stats.week }}">{{ t('last_7_days') }}</button>
+          <button type="button" class="pill" data-count="{{ visit_stats.month }}">{{ t('last_30_days') }}</button>
+          <button type="button" class="pill" data-count="{{ visit_stats.all }}">{{ t('all_time') }}</button>
         </div>
       </div>
     </div>

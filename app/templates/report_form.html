@@ -1,14 +1,14 @@
 {% extends "base.html" %}
-{% block title %}{{ subcategory.title }} — SPR{% endblock %}
+{% block title %}{{ sub_t(sub_key) }} — SPR{% endblock %}
 
 {% block content %}
 <section style="padding:44px 0;">
   <div class="wrap" style="max-width:640px;">
-    <a href="{{ url_for('report_category', cat_key=cat_key) }}" class="btn btn-ghost btn-sm" style="margin-bottom:18px;">← Back</a>
+    <a href="{{ url_for('report_category', cat_key=cat_key) }}" class="btn btn-ghost btn-sm" style="margin-bottom:18px;">← {{ t('nav_home') if False else 'Back' }}</a>
 
     <div class="dash-header">
-      <h1>{{ category.icon }} {{ subcategory.title }}</h1>
-      <p>Snap a photo, pin the location, and add a few details.</p>
+      <h1>{{ category.icon }} {{ sub_t(sub_key) }}</h1>
+      <p>{{ t('report_form_lede') }}</p>
     </div>
 
     <form method="POST" action="{{ url_for('submit') }}" enctype="multipart/form-data" id="reportForm">
@@ -20,49 +20,49 @@
 
         {% if subcategory.get('requires_photo', True) %}
         <div class="field">
-          <label>1. Take a Photo</label>
+          <label>1. {{ t('step_photo') }}</label>
           <div class="photo-capture" id="photoCapture">
             <img id="photoPreview" alt="Captured photo" style="display:none;">
             <div id="photoPlaceholder" class="photo-placeholder">
               <span style="font-size:2rem;">📷</span>
-              <span>Tap below to open your camera</span>
+              <span>{{ t('step_photo_hint') }}</span>
             </div>
           </div>
           <canvas id="stampCanvas" style="display:none;"></canvas>
           <input type="file" name="image" id="imageInput" accept="image/*" capture="environment" required style="display:none;">
-          <p class="field-note" id="stampNote" style="display:none;">📍 GPS location &amp; timestamp will be stamped onto your photo automatically.</p>
+          <p class="field-note" id="stampNote" style="display:none;">{{ t('gps_stamp_note') }}</p>
           <div style="display:flex; gap:10px; margin-top:10px;">
-            <button type="button" class="btn btn-primary btn-sm" id="takePhotoBtn">📷 Open Camera</button>
-            <button type="button" class="btn btn-ghost btn-sm" id="retakeBtn" style="display:none;">↺ Retake</button>
+            <button type="button" class="btn btn-primary btn-sm" id="takePhotoBtn">{{ t('open_camera') }}</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="retakeBtn" style="display:none;">{{ t('retake') }}</button>
           </div>
         </div>
         {% endif %}
 
         <div class="field">
-          <label>{{ '2' if subcategory.get('requires_photo', True) else '1' }}. Pin Your Location</label>
-          <p class="field-note" id="locationStatus">No location pinned yet.</p>
-          <button type="button" class="btn btn-primary btn-sm" id="pinLocationBtn" style="margin-bottom:12px;">📍 Pin My Location</button>
+          <label>{{ '2' if subcategory.get('requires_photo', True) else '1' }}. {{ t('step_location') }}</label>
+          <p class="field-note" id="locationStatus">{{ t('no_location_pinned') }}</p>
+          <button type="button" class="btn btn-primary btn-sm" id="pinLocationBtn" style="margin-bottom:12px;">{{ t('pin_my_location') }}</button>
           <div id="reportMap" class="report-map" style="display:none;"></div>
           <p class="field-note" id="mapError" style="display:none; color:var(--red-soft);"></p>
         </div>
 
         <div class="field" id="addressField" style="display:none;">
-          <label for="address">Address <span style="font-weight:400; color:var(--text-faint);">(auto-filled from your pin — edit if needed)</span></label>
-          <input type="text" id="address" name="address" placeholder="Address will appear here once you pin a location">
+          <label for="address">{{ t('address_label') }} <span style="font-weight:400; color:var(--text-faint);">{{ t('address_hint') }}</span></label>
+          <input type="text" id="address" name="address" placeholder="{{ t('address_placeholder') }}">
         </div>
 
         <div class="field">
-          <label for="description">{{ '3' if subcategory.get('requires_photo', True) else '2' }}. Description</label>
-          <textarea id="description" name="description" required maxlength="1000" placeholder="Describe what you're reporting..."></textarea>
+          <label for="description">{{ '3' if subcategory.get('requires_photo', True) else '2' }}. {{ t('step_description') }}</label>
+          <textarea id="description" name="description" required maxlength="1000" placeholder="{{ t('description_placeholder') }}"></textarea>
         </div>
 
         <div class="field">
-          <label for="location">Nearest Landmark <span style="font-weight:400; color:var(--text-faint);">(optional)</span></label>
-          <input type="text" id="location" name="location" placeholder="e.g. Near Bus Stand, Pauri">
+          <label for="location">{{ t('landmark_label') }} <span style="font-weight:400; color:var(--text-faint);">{{ t('optional') }}</span></label>
+          <input type="text" id="location" name="location" placeholder="{{ t('landmark_placeholder') }}">
         </div>
 
-        <button type="submit" class="btn btn-primary btn-block" id="submitBtn" disabled>Submit Report</button>
-        <p class="field-note" id="submitHint" style="text-align:center; margin-top:10px;">Take a photo and pin your location to enable submitting.</p>
+        <button type="submit" class="btn btn-primary btn-block" id="submitBtn" disabled>{{ t('submit_report') }}</button>
+        <p class="field-note" id="submitHint" style="text-align:center; margin-top:10px;">{{ t('submit_hint_photo') }}</p>
       </div>
     </form>
   </div>
@@ -141,7 +141,7 @@
 
       ctx.fillStyle='#ffffff';
       ctx.font='bold '+(lineH*0.95)+'px Arial, sans-serif';
-      var title=(locationInput && locationInput.value.trim()) || 'Pinned Report Location';
+      var title=(locationInput && locationInput.value.trim()) || I18N.defaultLocationTitle;
       ctx.fillText(title, textX, y);
       y+=lineH*1.15;
 
@@ -222,18 +222,18 @@
 
   function reverseGeocode(lat,lng){
     addressField.style.display='block';
-    addressInput.placeholder='Looking up address…';
+    addressInput.placeholder=I18N.lookingUpAddress;
     fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat='+lat+'&lon='+lng, {
       headers:{'Accept-Language':'en'}
     })
     .then(function(r){ return r.json(); })
     .then(function(data){
       if(data && data.display_name){ addressInput.value = data.display_name; lastAddress = data.display_name; }
-      addressInput.placeholder='Address will appear here once you pin a location';
+      addressInput.placeholder=I18N.addressPlaceholder;
       if(rawPhotoFile) applyStamp(rawPhotoFile);
     })
     .catch(function(){
-      addressInput.placeholder='Could not auto-fill address — type it in manually.';
+      addressInput.placeholder=I18N.couldNotAutofill;
     });
   }
 
@@ -243,7 +243,7 @@
     mapDiv.style.display='block';
     mapError.style.display='none';
     if(typeof L === 'undefined'){
-      mapError.textContent='⚠️ The map couldn\'t load (check your internet connection), but your location was still captured.';
+      mapError.textContent=I18N.mapLoadError1;
       mapError.style.display='block';
       mapDiv.style.display='none';
       hasLocation=true; checkReady();
@@ -263,7 +263,7 @@
           var plat=p.lat.toFixed(6), plng=p.lng.toFixed(6);
           coordinatesInput.value = plat+','+plng;
           lastLat=plat; lastLng=plng;
-          locationStatus.textContent='📍 Location pinned — drag the marker to fine-tune.';
+          locationStatus.textContent=I18N.locationPinnedDrag;
           reverseGeocode(plat,plng);
           if(rawPhotoFile) applyStamp(rawPhotoFile);
         });
@@ -273,11 +273,11 @@
       }
       setTimeout(function(){ map.invalidateSize(); }, 200);
     } catch(err){
-      mapError.textContent='⚠️ The map couldn\'t load, but your location was still captured.';
+      mapError.textContent=I18N.mapLoadError2;
       mapError.style.display='block';
       mapDiv.style.display='none';
     }
-    locationStatus.textContent='📍 Location pinned — drag the marker to fine-tune.';
+    locationStatus.textContent=I18N.locationPinnedDrag;
     reverseGeocode(lat,lng);
     hasLocation=true; checkReady();
     if(rawPhotoFile) applyStamp(rawPhotoFile);
@@ -285,14 +285,14 @@
 
   pinLocationBtn.addEventListener('click', function(){
     if(!navigator.geolocation){
-      locationStatus.textContent='Geolocation is not supported on this device.';
+      locationStatus.textContent=I18N.geoNotSupported;
       return;
     }
-    locationStatus.textContent='Getting your location…';
+    locationStatus.textContent=I18N.gettingLocation;
     navigator.geolocation.getCurrentPosition(function(pos){
       dropPin(pos.coords.latitude.toFixed(6), pos.coords.longitude.toFixed(6));
     }, function(){
-      locationStatus.textContent='Could not get your location. Please enable location access and try again.';
+      locationStatus.textContent=I18N.locationError;
     }, {enableHighAccuracy:true, timeout:10000});
   });
 

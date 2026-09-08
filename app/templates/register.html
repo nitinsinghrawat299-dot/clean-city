@@ -1,45 +1,57 @@
 {% extends "base.html" %}
-{% block title %}Create Account — SPR{% endblock %}
+{% block title %}{{ t('signup_title') }} — SPR{% endblock %}
 
 {% block content %}
 <section class="auth-shell">
   <div class="auth-card">
-    <h1>Create Account</h1>
-    <p class="sub">Join SPR and make a difference.</p>
+    <h1>{{ t('signup_title') }}</h1>
+    <p class="sub">{{ t('signup_subtitle') }}</p>
 
     <form method="POST" action="{{ url_for('register') }}">
       <div class="field">
-        <label for="username">Username</label>
-        <input type="text" id="username" name="username" required minlength="3" autofocus placeholder="Choose a username">
-        <p class="field-note">At least 3 characters. This is what other citizens see on the leaderboard.</p>
+        <label for="username">{{ t('username_label') }}</label>
+        <input type="text" id="username" name="username" required minlength="3" autofocus placeholder="{{ t('username_label') }}">
+        <p class="field-note">{{ t('username_hint') }}</p>
       </div>
 
       <div class="field">
-        <label for="email">Email</label>
+        <label for="email">{{ t('email_label') }}</label>
         <input type="email" id="email" name="email" required placeholder="you@example.com">
       </div>
 
       <div class="field">
-        <label for="password">Password</label>
+        <label for="password">{{ t('password_label') }}</label>
         <div class="input-row">
-          <input type="password" id="password" name="password" required minlength="4" placeholder="Create a password">
+          <input type="password" id="password" name="password" required minlength="4" placeholder="{{ t('password_label') }}">
           <button type="button" class="toggle-visibility" onclick="const f=document.getElementById('password'); f.type = f.type==='password' ? 'text' : 'password'; this.textContent = f.type==='password' ? '👁️' : '🙈';">👁️</button>
         </div>
-        <p class="field-note">At least 4 characters.</p>
+        <p class="field-note">{{ t('password_hint') }}</p>
       </div>
 
       <div class="field">
-        <label for="confirm_password">Confirm Password</label>
+        <label for="confirm_password">{{ t('confirm_password_label') }}</label>
         <div class="input-row">
-          <input type="password" id="confirm_password" name="confirm_password" required placeholder="Confirm your password">
+          <input type="password" id="confirm_password" name="confirm_password" required placeholder="{{ t('confirm_password_label') }}">
           <button type="button" class="toggle-visibility" onclick="const f=document.getElementById('confirm_password'); f.type = f.type==='password' ? 'text' : 'password'; this.textContent = f.type==='password' ? '👁️' : '🙈';">👁️</button>
         </div>
       </div>
 
-      <button type="submit" class="btn btn-primary btn-block" style="margin-top:8px;">Register</button>
+      <div class="field">
+        <label>{{ t('preferred_language') }}</label>
+        <div style="display:flex; gap:10px;">
+          <label class="pill" style="cursor:pointer; display:flex; align-items:center; gap:6px;">
+            <input type="radio" name="language" value="en" checked style="margin:0;"> {{ t('lang_english') }}
+          </label>
+          <label class="pill" style="cursor:pointer; display:flex; align-items:center; gap:6px;">
+            <input type="radio" name="language" value="hi" style="margin:0;"> {{ t('lang_hindi') }}
+          </label>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block" style="margin-top:8px;">{{ t('signup_btn') }}</button>
     </form>
 
-    <p class="auth-footer">Already have an account? <a href="{{ url_for('citizen_login') }}">Login here</a></p>
+    <p class="auth-footer">{{ t('have_account') }} <a href="{{ url_for('citizen_login') }}">{{ t('login_link') }}</a></p>
   </div>
 </section>
 {% endblock %}

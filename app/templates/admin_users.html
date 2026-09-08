@@ -1,13 +1,13 @@
 {% extends "base_admin.html" %}
-{% block title %}Manage Citizens — SPR Admin{% endblock %}
+{% block title %}{{ t('manage_citizens') }} — SPR Admin{% endblock %}
 
 {% block content %}
 <div class="admin-topbar">
   <div>
-    <h1>Manage Citizens</h1>
-    <p>View and manage all registered citizen accounts.</p>
+    <h1>{{ t('manage_citizens') }}</h1>
+    <p>{{ t('manage_citizens_sub') }}</p>
   </div>
-  <input type="text" class="search-input" id="userSearch" placeholder="Search citizens…" onkeyup="filterUsers()">
+  <input type="text" class="search-input" id="userSearch" placeholder="{{ t('search_citizens') }}" onkeyup="filterUsers()">
 </div>
 
 {% if users %}
@@ -15,11 +15,11 @@
   <table class="data-table" id="usersTable">
     <thead>
       <tr>
-        <th>Citizen</th>
-        <th>Email</th>
-        <th>Badge</th>
-        <th>Points</th>
-        <th>Action</th>
+        <th>{{ t('col_citizen') }}</th>
+        <th>{{ t('col_email') }}</th>
+        <th>{{ t('badge') }}</th>
+        <th>{{ t('points') }}</th>
+        <th>{{ t('col_action') }}</th>
       </tr>
     </thead>
     <tbody>
@@ -35,8 +35,8 @@
           <td>{{ u.badge_icon }} {{ u.badge_name }}</td>
           <td><strong>{{ u.points | default(0) }}</strong></td>
           <td>
-            <form method="POST" action="{{ url_for('admin_delete_user', user_id=u.id) }}" onsubmit="return confirm('Delete {{ u.username }}\'s account permanently?');">
-              <button type="submit" class="icon-btn danger" title="Delete citizen">🗑</button>
+            <form method="POST" action="{{ url_for('admin_delete_user', user_id=u.id) }}" onsubmit="return confirm('{{ t('delete_prefix') }}{{ u.username }}{{ t('delete_citizen_confirm_suffix') }}');">
+              <button type="submit" class="icon-btn danger" title="{{ t('delete_citizen') }}">🗑</button>
             </form>
           </td>
         </tr>
@@ -47,7 +47,7 @@
 {% else %}
 <div class="empty-state">
   <div class="ic">👥</div>
-  <p>No citizens have registered yet.</p>
+  <p>{{ t('no_citizens_yet') }}</p>
 </div>
 {% endif %}
 {% endblock %}

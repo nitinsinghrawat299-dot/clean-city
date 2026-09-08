@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Municipality Login — SPR{% endblock %}
+{% block title %}{{ t('admin_login_title') }} — SPR{% endblock %}
 
 {% block header %}
 <header class="site-header">
@@ -8,6 +8,9 @@
       <span class="logo-mark">🌱</span>
       <span>SPR<small>Municipality Portal</small></span>
     </a>
+    <div class="nav-actions">
+      <a href="{{ url_for('set_language', lang='hi' if get_lang()=='en' else 'en') }}" class="btn btn-ghost btn-sm">🌐 {{ t('lang_toggle') }}</a>
+    </div>
   </nav>
 </header>
 {% endblock %}
@@ -15,25 +18,25 @@
 {% block content %}
 <section class="auth-shell">
   <div class="auth-card">
-    <h1>Municipality Login</h1>
-    <p class="sub">Staff access to manage reports and citizen accounts.</p>
+    <h1>{{ t('admin_login_title') }}</h1>
+    <p class="sub">{{ t('staff_access_subtitle') }}</p>
 
     <form method="POST" action="{{ url_for('login') }}">
       <div class="field">
-        <label for="username">Username</label>
-        <input type="text" id="username" name="username" required autofocus placeholder="Municipality username">
+        <label for="username">{{ t('username_label') }}</label>
+        <input type="text" id="username" name="username" required autofocus placeholder="{{ t('username_label') }}">
       </div>
       <div class="field">
-        <label for="password">Password</label>
+        <label for="password">{{ t('password_label') }}</label>
         <div class="input-row">
-          <input type="password" id="password" name="password" required placeholder="Enter password">
+          <input type="password" id="password" name="password" required placeholder="{{ t('password_label') }}">
           <button type="button" class="toggle-visibility" onclick="const f=document.getElementById('password'); f.type = f.type==='password' ? 'text' : 'password'; this.textContent = f.type==='password' ? '👁️' : '🙈';">👁️</button>
         </div>
       </div>
-      <button type="submit" class="btn btn-primary btn-block" style="margin-top:8px;">Login</button>
+      <button type="submit" class="btn btn-primary btn-block" style="margin-top:8px;">{{ t('login_btn') }}</button>
     </form>
 
-    <p class="auth-footer"><a href="{{ url_for('home') }}">← Back to citizen site</a></p>
+    <p class="auth-footer"><a href="{{ url_for('home') }}">{{ t('back_to_citizen_site') }}</a></p>
   </div>
 </section>
 {% endblock %}

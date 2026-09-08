@@ -1,37 +1,37 @@
 {% extends "base.html" %}
-{% block title %}Login — SPR{% endblock %}
+{% block title %}{{ t('nav_login') }} — SPR{% endblock %}
 
 {% block content %}
 <section class="auth-shell">
   <div class="auth-card">
-    <h1>Welcome Back!</h1>
-    <p class="sub">Login to report garbage and track your SPR impact.</p>
+    <h1>{{ t('login_title') }}</h1>
+    <p class="sub">{{ t('login_subtitle') }}</p>
 
     <form method="POST" action="{{ url_for('citizen_login') }}">
       <div class="field">
-        <label for="username">Username</label>
+        <label for="username">{{ t('username_label') }}</label>
         <div class="input-row">
-          <input type="text" id="username" name="username" value="{{ prefill_username }}" required autofocus placeholder="Enter your username">
+          <input type="text" id="username" name="username" value="{{ prefill_username }}" required autofocus placeholder="{{ t('username_label') }}">
         </div>
       </div>
 
       <div class="field">
-        <label for="password">Password</label>
+        <label for="password">{{ t('password_label') }}</label>
         <div class="input-row">
-          <input type="password" id="password" name="password" value="{{ prefill_password }}" required placeholder="Enter your password">
+          <input type="password" id="password" name="password" value="{{ prefill_password }}" required placeholder="{{ t('password_label') }}">
           <button type="button" class="toggle-visibility" onclick="const f=document.getElementById('password'); f.type = f.type==='password' ? 'text' : 'password'; this.textContent = f.type==='password' ? '👁️' : '🙈';">👁️</button>
         </div>
       </div>
 
       <div class="auth-links">
         <span></span>
-        <a href="{{ url_for('forgot_password') }}">Forgot your password?</a>
+        <a href="{{ url_for('forgot_password') }}">{{ t('forgot_password_link') }}</a>
       </div>
 
-      <button type="submit" class="btn btn-primary btn-block" style="margin-top:22px;">🚀 Login</button>
+      <button type="submit" class="btn btn-primary btn-block" style="margin-top:22px;">🚀 {{ t('login_btn') }}</button>
     </form>
 
-    <p class="auth-footer">Don't have an account? <a href="{{ url_for('register') }}">Create one</a></p>
+    <p class="auth-footer">{{ t('no_account') }} <a href="{{ url_for('register') }}">{{ t('create_account') }}</a></p>
   </div>
 </section>
 {% endblock %}

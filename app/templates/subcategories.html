@@ -1,24 +1,24 @@
 {% extends "base.html" %}
-{% block title %}{{ category.title }} — SPR{% endblock %}
+{% block title %}{{ cat_t(cat_key) }} — SPR{% endblock %}
 
 {% block content %}
 <section style="padding:44px 0;">
   <div class="wrap">
-    <a href="{{ url_for('home') }}" class="btn btn-ghost btn-sm" style="margin-bottom:18px;">← Back to Categories</a>
+    <a href="{{ url_for('home') }}" class="btn btn-ghost btn-sm" style="margin-bottom:18px;">{{ t('back_to_categories') }}</a>
 
     <div class="dash-header">
-      <h1>{{ category.icon }} {{ category.title }}</h1>
-      <p>Select exactly what you'd like to report.</p>
+      <h1>{{ category.icon }} {{ cat_t(cat_key) }}</h1>
+      <p>{{ t('subcategories_subtitle') }}</p>
     </div>
 
     <div style="display:flex; flex-direction:column; gap:12px;">
       {% for sub_key, sub in category.subcats.items() %}
         <a href="{{ url_for('report_subcategory', cat_key=cat_key, sub_key=sub_key) }}" class="card" style="display:flex; align-items:center; justify-content:space-between; gap:14px; text-decoration:none; color:inherit; padding:18px 22px;">
-          <span style="font-weight:600;">{{ sub.title }}</span>
+          <span style="font-weight:600;">{{ sub_t(sub_key) }}</span>
           {% if sub.enabled %}
-            <span class="btn btn-primary btn-sm" style="pointer-events:none;">Report →</span>
+            <span class="btn btn-primary btn-sm" style="pointer-events:none;">{{ t('report_btn') }}</span>
           {% else %}
-            <span class="status" style="pointer-events:none;">Coming Soon</span>
+            <span class="status" style="pointer-events:none;">{{ t('coming_soon') }}</span>
           {% endif %}
         </a>
       {% endfor %}

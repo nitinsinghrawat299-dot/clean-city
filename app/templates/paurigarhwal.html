@@ -1495,6 +1495,8 @@
       </div>
 
       <div class="header-actions">
+        <a href="{{ url_for('home') }}" class="header-btn" style="text-decoration:none;">← SPR</a>
+        <a href="{{ url_for('set_language', lang='hi' if get_lang()=='en' else 'en') }}" class="header-btn" style="text-decoration:none;">🌐 {{ t('lang_toggle') }}</a>
         <button class="header-btn" onclick="document.body.classList.toggle('large-text')">A+</button>
         <button class="header-btn" onclick="window.print()">Print</button>
       </div>
