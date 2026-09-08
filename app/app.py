@@ -33,14 +33,33 @@ def set_language(lang):
  return redirect(dest)
 
 # ---- Firebase / Firestore ----
+# Credentials can come from any of, in order of priority:
+#  1. FIREBASE_SERVICE_ACCOUNT_JSON  - env var containing the raw JSON key
+#  2. FIREBASE_SERVICE_ACCOUNT_PATH  - explicit path to a mounted key file
+#  3. GOOGLE_APPLICATION_CREDENTIALS - the standard Google env var, if you
+#     pointed it at your Render Secret File's path
+#  4. /etc/secrets/*.json            - Render's default Secret File mount
+#     location, auto-detected so you don't have to hardcode the filename
 _cred_json=os.getenv('FIREBASE_SERVICE_ACCOUNT_JSON')
+_cred_path=os.getenv('FIREBASE_SERVICE_ACCOUNT_PATH') or os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
+if not _cred_path and os.path.isdir('/etc/secrets'):
+ _found=[f for f in os.listdir('/etc/secrets') if f.lower().endswith('.json')]
+ if _found: _cred_path=os.path.join('/etc/secrets',_found[0])
 if not firebase_admin._apps:
  if _cred_json:
   firebase_admin.initialize_app(credentials.Certificate(json.loads(_cred_json)))
+ elif _cred_path and os.path.isfile(_cred_path):
+  firebase_admin.initialize_app(credentials.Certificate(_cred_path))
  else:
-  # No JSON in env: fall back to Application Default Credentials.
-  # This is what Cloud Run's built-in service account provides automatically.
-  firebase_admin.initialize_app()
+  # No JSON in env and no credentials file found on disk.
+  # Fail loudly with a clear message instead of crashing later with a
+  # confusing generic error on every request.
+  raise RuntimeError(
+   'Firebase is not configured: no FIREBASE_SERVICE_ACCOUNT_JSON env var, '
+   'no FIREBASE_SERVICE_ACCOUNT_PATH/GOOGLE_APPLICATION_CREDENTIALS, and '
+   'no .json file found under /etc/secrets. If you added a Render Secret '
+   'File, double-check its mount path in the Render dashboard.'
+  )
 db=firestore.client()
 
 # ---- Cloudinary ----
