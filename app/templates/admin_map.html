@@ -1,0 +1,56 @@
+{% extends "base_admin.html" %}
+{% block title %}Reports Map — SPR Admin{% endblock %}
+
+{% block content %}
+<div class="admin-topbar">
+  <div>
+    <h1>🗺️ City Reports Map</h1>
+    <p>{{ total }} report{{ 's' if total != 1 }} shown &middot; {{ resolved }} resolved &middot; {{ pending }} pending &middot; {{ denied }} denied</p>
+  </div>
+  <div style="display:flex; gap:6px; flex-wrap:wrap;">
+    <a href="{{ url_for('admin_map', range='today') }}" class="pill {{ 'active' if rng=='today' }}">Today</a>
+    <a href="{{ url_for('admin_map', range='week') }}" class="pill {{ 'active' if rng=='week' }}">Last 7 Days</a>
+    <a href="{{ url_for('admin_map', range='month') }}" class="pill {{ 'active' if rng=='month' }}">Last 30 Days</a>
+    <a href="{{ url_for('admin_map', range='all') }}" class="pill {{ 'active' if rng=='all' }}">All Time</a>
+  </div>
+</div>
+
+<div class="card" style="padding:0; overflow:hidden;">
+  <div id="cityMap" style="height:560px;"></div>
+</div>
+
+<div class="card" style="margin-top:16px; display:flex; gap:22px; flex-wrap:wrap; font-size:.85rem;">
+  <span><span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#f0b429; margin-right:6px;"></span>Pending</span>
+  <span><span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#3ea55a; margin-right:6px;"></span>Resolved</span>
+  <span><span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#d64545; margin-right:6px;"></span>Denied</span>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function(){
+  var pins = {{ pins | tojson }};
+  var map = L.map('cityMap').setView([30.1489, 78.7803], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
+  }).addTo(map);
+
+  var colors = { 'Resolved': '#3ea55a', 'Denied': '#d64545' };
+  var bounds = [];
+  pins.forEach(function(p){
+    var color = colors[p.status] || '#f0b429';
+    var marker = L.circleMarker([p.lat, p.lng], {
+      radius: 8, color: '#fff', weight: 2, fillColor: color, fillOpacity: 0.95
+    }).addTo(map);
+    marker.bindPopup(
+      '<strong>#' + (p.report_number || '') + '</strong> — ' + p.status +
+      '<br>' + p.title + '<br><span style="color:#888;font-size:.8em;">' + p.created_at + '</span>'
+    );
+    bounds.push([p.lat, p.lng]);
+  });
+  if (bounds.length) map.fitBounds(bounds, { padding: [30, 30] });
+})();
+</script>
+{% endblock %}

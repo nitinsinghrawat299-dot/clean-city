@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Rate Us — SPR{% endblock %}
+
+{% block content %}
+<section style="padding:44px 0;">
+  <div class="wrap" style="max-width:560px;">
+    <div class="dash-header">
+      <h1>⭐ Rate Pauri Nagar Palika</h1>
+      <p>Tell us how we're doing — your feedback helps the municipality improve.</p>
+    </div>
+
+    <form method="POST" action="{{ url_for('feedback_form') }}" class="card card-lg">
+      <div class="field">
+        <label>Your rating</label>
+        <div class="rate-row" id="rateRow">
+          {% for n in range(0,6) %}
+            <label class="rate-opt">
+              <input type="radio" name="rating" value="{{ n }}" {{ 'checked' if n==5 }}>
+              <span>{{ n }}</span>
+            </label>
+          {% endfor %}
+        </div>
+        <p class="field-note">0 = very unsatisfied, 5 = excellent</p>
+      </div>
+
+      <div class="field">
+        <label for="comment">Your feedback <span style="font-weight:400; color:var(--text-muted);">(optional)</span></label>
+        <textarea id="comment" name="comment" maxlength="1000" placeholder="What's working well? What should we improve?"></textarea>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block">Submit Feedback</button>
+    </form>
+  </div>
+</section>
+{% endblock %}

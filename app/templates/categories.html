@@ -17,6 +17,17 @@
           <p style="color:var(--text-muted); font-size:.85rem;">{{ cat.subcats|length }} report type{{ 's' if cat.subcats|length != 1 }}</p>
         </a>
       {% endfor %}
+
+      <a href="{{ url_for('survey') }}" class="card" style="display:block; text-decoration:none; color:inherit; border:1px solid rgba(240,180,41,.35); background:linear-gradient(160deg,rgba(240,180,41,.07),transparent);">
+        <div style="font-size:2.2rem; margin-bottom:10px;">📋</div>
+        <h3 style="font-size:1.05rem; margin-bottom:6px;">Cleanliness Survey</h3>
+        <p style="color:var(--text-muted); font-size:.85rem;">Share your experience — 13 quick questions</p>
+      </a>
+      <a href="{{ url_for('feedback_form') }}" class="card" style="display:block; text-decoration:none; color:inherit; border:1px solid rgba(62,165,90,.35); background:linear-gradient(160deg,rgba(62,165,90,.07),transparent);">
+        <div style="font-size:2.2rem; margin-bottom:10px;">⭐</div>
+        <h3 style="font-size:1.05rem; margin-bottom:6px;">Rate Nagar Palika</h3>
+        <p style="color:var(--text-muted); font-size:.85rem;">Rate us 0–5 and leave feedback</p>
+      </a>
     </div>
   </div>
 </section>

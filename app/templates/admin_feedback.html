@@ -1,0 +1,44 @@
+{% extends "base_admin.html" %}
+{% block title %}Feedback — SPR Admin{% endblock %}
+
+{% block content %}
+<div class="admin-topbar">
+  <div>
+    <h1>⭐ Citizen Feedback</h1>
+    <p>{{ total }} rating{{ 's' if total != 1 }} submitted.</p>
+  </div>
+  <div class="card" style="padding:14px 24px; text-align:center;">
+    <div style="font-size:2rem; font-weight:800; color:var(--green-700,#126b3c); line-height:1;">{{ avg }}<span style="font-size:1rem; color:var(--text-muted);">/5</span></div>
+    <div style="font-size:.72rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; margin-top:4px;">Average Rating</div>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:18px;">
+  {% for n in [5,4,3,2,1,0] %}
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+      <span style="width:60px; font-size:.82rem; color:var(--text-muted);">{{ n }} star{{ 's' if n != 1 }}</span>
+      <div style="flex:1; background:var(--border); border-radius:6px; height:8px; overflow:hidden;">
+        <div style="width:{{ (dist[n]*100/total) if total else 0 }}%; background:linear-gradient(90deg,var(--green-500),var(--teal-mist)); height:100%;"></div>
+      </div>
+      <span style="width:30px; text-align:right; font-size:.82rem; color:var(--text-muted);">{{ dist[n] }}</span>
+    </div>
+  {% endfor %}
+</div>
+
+<div class="card">
+  <h3 style="font-size:1rem; margin-bottom:14px;">Recent feedback</h3>
+  {% if total == 0 %}
+    <p style="color:var(--text-muted);">No feedback yet.</p>
+  {% endif %}
+  {% for r in rows %}
+    <div style="padding:12px 0; border-bottom:1px solid var(--border);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+        <strong style="font-size:.9rem;">{{ r.citizen_username }}</strong>
+        <span style="font-size:.8rem; color:var(--green-700,#126b3c); font-weight:700;">{{ r.rating }}/5</span>
+      </div>
+      {% if r.comment %}<p style="color:var(--text-muted); font-size:.86rem; margin-bottom:4px;">{{ r.comment }}</p>{% endif %}
+      <span style="font-size:.75rem; color:var(--text-faint);">{{ r.created_at.strftime('%d %b %Y') if r.created_at else '' }}</span>
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -400,3 +400,69 @@ img{width:100%;height:auto;object-fit:cover;}
   display:flex; align-items:center; justify-content:center; font-weight:600; font-family:'Fraunces',serif;
 }
 .report-thumb-empty{display:flex; align-items:center; justify-content:center; background:var(--paper-alt); color:var(--text-faint); font-size:.85rem;}
+/* =========================================================
+   SURVEY & FEEDBACK COMPONENTS
+   ========================================================= */
+.survey-form{display:flex; flex-direction:column; gap:26px;}
+.survey-q{border:none; padding:0; margin:0;}
+.survey-q legend{font-weight:700; font-size:.92rem; color:var(--text-main); margin-bottom:12px; padding:0; line-height:1.4;}
+.survey-q .req{color:#d64545;}
+.survey-options{display:flex; flex-direction:column; gap:8px;}
+.survey-opt{display:flex; align-items:flex-start; gap:10px; padding:10px 14px; border:1.5px solid var(--border); border-radius:10px; cursor:pointer; transition:all .16s var(--ease); font-size:.87rem; color:var(--text-muted);}
+.survey-opt:hover{border-color:var(--green-500); background:rgba(123,229,154,.06);}
+.survey-opt.checked, .survey-opt:has(input:checked){border-color:var(--green-500); background:rgba(123,229,154,.1); color:var(--text-main); font-weight:600;}
+.survey-opt input{margin-top:3px; accent-color:var(--green-500);}
+
+.rate-row{display:flex; gap:8px; flex-wrap:wrap;}
+.rate-opt{cursor:pointer;}
+.rate-opt input{display:none;}
+.rate-opt span{display:flex; align-items:center; justify-content:center; width:46px; height:46px; border-radius:50%; border:2px solid var(--border); font-weight:700; color:var(--text-muted); transition:all .16s var(--ease);}
+.rate-opt input:checked + span{background:linear-gradient(135deg,var(--green-500),var(--green-700)); color:#fff; border-color:var(--green-700); transform:scale(1.08);}
+
+.admin-table{width:100%; border-collapse:collapse; font-size:.85rem;}
+.admin-table th{text-align:left; padding:10px 12px; color:var(--text-faint); font-weight:600; text-transform:uppercase; font-size:.7rem; letter-spacing:.04em; border-bottom:2px solid var(--border);}
+.admin-table td{padding:10px 12px; border-bottom:1px solid var(--border); color:var(--text-main);}
+.admin-table tr:hover td{background:rgba(123,229,154,.05);}
+
+/* =========================================================
+   CENTRAL GOVT / SWACHH BHARAT CLEANLINESS-INITIATIVE THEME
+   ========================================================= */
+:root{
+  --saffron:#FF9933; --india-green:#138808; --chakra-blue:#0B4C8C; --tricolor-white:#ffffff;
+}
+.gov-ribbon{
+  background:#0d2f1d; color:#eafff0; font-size:.74rem; font-weight:600;
+  letter-spacing:.02em; padding:6px 0; position:relative; overflow:hidden;
+}
+.gov-ribbon::before{
+  content:""; position:absolute; left:0; top:0; right:0; height:3px;
+  background:linear-gradient(90deg, var(--saffron) 0 33.3%, var(--tricolor-white) 33.3% 66.6%, var(--india-green) 66.6% 100%);
+}
+.gov-ribbon .wrap{display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; padding-top:3px;}
+.gov-ribbon .emblem-row{display:flex; align-items:center; gap:8px;}
+.gov-ribbon .chakra{width:16px; height:16px; flex:0 0 auto;}
+.gov-ribbon a{color:#c7e6d0; text-decoration:none;}
+.gov-ribbon a:hover{color:#fff; text-decoration:underline;}
+.gov-ribbon .swachh-badge{
+  display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.18); border-radius:999px; padding:3px 10px; font-weight:700;
+}
+
+/* Tricolor hairline used on official cards/sections instead of the plain green one */
+.card.gov-card{border-top:3px solid transparent; border-image:linear-gradient(90deg,var(--saffron),var(--tricolor-white),var(--india-green)) 1;}
+.dash-header h1{position:relative;}
+.dash-header h1::after{
+  content:""; display:block; width:64px; height:4px; margin-top:10px; border-radius:2px;
+  background:linear-gradient(90deg,var(--saffron),var(--india-green));
+}
+
+/* Official emblem-style seal on the logo mark */
+.logo-mark{
+  background:radial-gradient(circle at 35% 30%, rgba(255,255,255,.9), rgba(255,255,255,0) 60%), var(--green-700);
+  border-radius:50%; padding:6px; box-sizing:border-box;
+  box-shadow:0 0 0 2px rgba(255,255,255,.5), 0 0 0 3.5px var(--green-700);
+}
+
+@media (max-width:640px){
+  .gov-ribbon .wrap{justify-content:center; text-align:center;}
+}

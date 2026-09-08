@@ -1,0 +1,51 @@
+{% extends "base_admin.html" %}
+{% block title %}Survey Responses — SPR Admin{% endblock %}
+
+{% block content %}
+<div class="admin-topbar">
+  <div>
+    <h1>📋 Cleanliness Survey Responses</h1>
+    <p>{{ total }} response{{ 's' if total != 1 }} collected.</p>
+  </div>
+</div>
+
+{% if total == 0 %}
+  <div class="card">No survey responses yet.</div>
+{% else %}
+  {% for q in tallies %}
+    <div class="card" style="margin-bottom:16px;">
+      <h3 style="font-size:.95rem; margin-bottom:14px;">{{ loop.index }}. {{ q.text }}</h3>
+      {% for row in q.rows %}
+        <div style="margin-bottom:10px;">
+          <div style="display:flex; justify-content:space-between; font-size:.82rem; color:var(--text-muted); margin-bottom:4px;">
+            <span>{{ row.label }}</span><span>{{ row.count }} ({{ row.pct }}%)</span>
+          </div>
+          <div style="background:var(--border); border-radius:6px; height:8px; overflow:hidden;">
+            <div style="width:{{ row.pct }}%; background:linear-gradient(90deg,var(--green-500),var(--teal-mist)); height:100%;"></div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% endfor %}
+
+  <div class="card">
+    <h3 style="font-size:1rem; margin-bottom:14px;">Raw responses ({{ total }})</h3>
+    <div style="overflow-x:auto;">
+      <table class="admin-table">
+        <thead><tr><th>Citizen</th><th>Date</th><th>Q5 Cleanliness</th><th>Q7 Authority Effectiveness</th><th>Q13 Response Rating</th></tr></thead>
+        <tbody>
+          {% for s in subs %}
+            <tr>
+              <td>{{ s.citizen_username }}</td>
+              <td>{{ s.created_at.strftime('%d %b %Y') if s.created_at else '—' }}</td>
+              <td>{{ s.answers.get('q5','—') }}</td>
+              <td>{{ s.answers.get('q7','—') }}</td>
+              <td>{{ s.answers.get('q13','—') }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}

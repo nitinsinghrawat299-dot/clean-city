@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Cleanliness Survey — SPR{% endblock %}
+
+{% block content %}
+<section style="padding:44px 0;">
+  <div class="wrap" style="max-width:760px;">
+    <div class="dash-header">
+      <h1>📋 Citizen Cleanliness Survey</h1>
+      <p>Help Pauri Nagar Palika understand how cleanliness services are working in your area. All questions are required.</p>
+    </div>
+
+    <form method="POST" action="{{ url_for('survey') }}" class="card card-lg survey-form">
+      {% for q in questions %}
+        <fieldset class="survey-q">
+          <legend>{{ loop.index }}. {{ q.text }} <span class="req">*</span></legend>
+          <div class="survey-options">
+            {% for opt in q.options %}
+              <label class="survey-opt {{ 'checked' if answers.get(q.id) == opt }}">
+                <input type="radio" name="{{ q.id }}" value="{{ opt }}" {{ 'checked' if answers.get(q.id) == opt }} required>
+                <span>{{ opt }}</span>
+              </label>
+            {% endfor %}
+          </div>
+        </fieldset>
+      {% endfor %}
+
+      <button type="submit" class="btn btn-primary btn-block">Submit Survey</button>
+    </form>
+  </div>
+</section>
+{% endblock %}

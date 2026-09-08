@@ -114,6 +114,43 @@ def category_label(cat_key,sub_key):
  if not sub: return cat['icon']+' '+t('cat_'+cat_key)
  return cat['icon']+' '+t('sub_'+sub_key)
 
+# ---- Citizen Cleanliness Survey ----
+SURVEY_QUESTIONS=[
+ {'id':'q1','text':'Is waste collected from your household/shop on a daily basis?','options':[
+   'Yes, From household','Yes, From common collection points',
+   'Yes, Collected daily but specific types of waste are collected on designated days','No']},
+ {'id':'q2','text':'Does your household/shop segregate waste at least into dry and wet categories before disposal?','options':[
+   'Yes, Always','Yes, Sometimes','No, Unaware of segregation','Aware but do not segregate waste']},
+ {'id':'q3','text':'Does the waste collector collect and load waste into the vehicle in a segregated manner (by category), or is it mixed during collection/loading?','options':[
+   'Waste is collected and loaded separately by category (segregated)',
+   'Waste is collected separately but mixed during loading',
+   'Waste is collected and loaded in mixed form']},
+ {'id':'q4','text':'Does daily sweeping take place in your area?','options':['Yes','No']},
+ {'id':'q5','text':'How would you rate the cleanliness of your residential area in terms of visible cleanliness?','options':[
+   'Very poor','Poor','Average','Good','Excellent']},
+ {'id':'q6','text':'How often do you see unattended garbage dumps or garbage piles near your area?','options':[
+   'Never','Rarely','Sometimes','Often','Very often']},
+ {'id':'q7','text':'How effective do you think the local authorities are in maintaining cleanliness in public spaces like markets, bazaars, parks, gardens or other areas?','options':[
+   'Very ineffective','Ineffective','Neutral','Effective','Very effective']},
+ {'id':'q8','text':'Do you see people openly urinating or defecating in public or nearby areas?','options':[
+   'No, Never','Yes, Rarely','Yes, Sometimes','Yes, Frequently']},
+ {'id':'q9','text':'How satisfied are you with the cleanliness and maintenance of public toilets in your area?','options':[
+   'Very dissatisfied','Dissatisfied','Neutral','Satisfied','Very satisfied',
+   'Have not used any public toilet recently','No public toilet available in my area']},
+ {'id':'q10','text':'Are you aware of the Reduce, Reuse, Recycle (RRR) centers in your city for waste management?','options':[
+   'Yes, I know about them and have used their services','Yes, I have heard of them but never used their services',
+   'No, I am not aware of RRR centers']},
+ {'id':'q11','text':'Who do you contact when your sewer or septic tank needs cleaning?','options':[
+   'Local Municipality/ULB','Private Licensed Operator/Contractor','Private Individual/Local Laborer']},
+ {'id':'q12','text':'How do you report cleanliness-related issues (e.g., garbage dumping, overflowing bins, lack of sanitation) to the local authorities?','options':[
+   'I use the Swachhata App','I use a local city app','I use other mode such as helpline number/portal, social media etc.',
+   'No grievance redressal mechanism works effectively','I am not aware of any Grievance Redressal Mechanism']},
+ {'id':'q13','text':"How would you rate the city's response to your cleanliness-related complaints (e.g., garbage dumping, overflowing bins)?",'options':[
+   '5 (The issue was addressed and resolved quickly.)','4 (The issue was resolved, but required follow-up)',
+   '3 (The issue was addressed but not resolved satisfactorily.)','2 (The complaint was acknowledged, but no action was taken.)',
+   '1 (The complaint was ignored or not registered.)','I did not feel the need to report any issue']},
+]
+
 # ---- Firestore helpers ----
 def _doc(snap):
  if not snap or not snap.exists: return None
@@ -233,6 +270,41 @@ def leaderboard():
  for i,u in enumerate(docs,1):
   ud=u.to_dict() or {}; ic,b=badge(ud.get('points',0)); data.append({'rank':i,'username':ud.get('username',''),'points':ud.get('points',0),'icon':ic,'badge':b})
  return render_template('leaderboard.html',users=data)
+@app.route('/survey',methods=['GET','POST'])
+def survey():
+ if not session.get('citizen_id'): return redirect(url_for('citizen_login'))
+ if request.method=='POST':
+  answers={}; missing=False
+  for q in SURVEY_QUESTIONS:
+   v=request.form.get(q['id'],'').strip()
+   if not v: missing=True
+   answers[q['id']]=v
+  if missing:
+   flash('Please answer every question before submitting.')
+   return render_template('survey.html',questions=SURVEY_QUESTIONS,answers=answers)
+  db.collection('surveys').document(uuid.uuid4().hex).set({
+   'citizen_id':session['citizen_id'],'citizen_username':session.get('citizen_username','Citizen'),
+   'answers':answers,'created_at':now_iso(),
+  })
+  flash('🙏 Thank you — your survey response has been recorded!')
+  return redirect(url_for('home'))
+ return render_template('survey.html',questions=SURVEY_QUESTIONS,answers={})
+@app.route('/feedback',methods=['GET','POST'])
+def feedback_form():
+ if not session.get('citizen_id'): return redirect(url_for('citizen_login'))
+ if request.method=='POST':
+  try: rating=int(request.form.get('rating',''))
+  except (TypeError,ValueError): rating=None
+  if rating is None or rating<0 or rating>5:
+   flash('Please choose a rating from 0 to 5.')
+   return redirect(url_for('feedback_form'))
+  db.collection('feedback').document(uuid.uuid4().hex).set({
+   'citizen_id':session['citizen_id'],'citizen_username':session.get('citizen_username','Citizen'),
+   'rating':rating,'comment':request.form.get('comment','')[:1000],'created_at':now_iso(),
+  })
+  flash('🙏 Thanks for your feedback!')
+  return redirect(url_for('home'))
+ return render_template('feedback.html')
 @app.route('/submit',methods=['POST'])
 def submit():
  if not session.get('citizen_id'): return redirect(url_for('citizen_login'))
@@ -325,6 +397,63 @@ def admin_delete_user(user_id):
  if not session.get('admin_logged_in'): return redirect(url_for('login'))
  db.collection('users').document(user_id).delete()
  return redirect(url_for('admin_users'))
+@app.route('/admin/surveys')
+def admin_surveys():
+ if not session.get('admin_logged_in'): return redirect(url_for('login'))
+ subs=[_doc(d) for d in db.collection('surveys').stream()]
+ for s in subs: s['created_at']=parse_dt(s.get('created_at'))
+ subs.sort(key=lambda s:s['created_at'] or datetime.datetime.min,reverse=True)
+ tallies=[]
+ for q in SURVEY_QUESTIONS:
+  counts={opt:0 for opt in q['options']}
+  for s in subs:
+   ans=(s.get('answers') or {}).get(q['id'])
+   if ans in counts: counts[ans]+=1
+  total=sum(counts.values()) or 1
+  tallies.append({'id':q['id'],'text':q['text'],
+   'rows':[{'label':opt,'count':counts[opt],'pct':round(counts[opt]*100/total)} for opt in q['options']]})
+ return render_template('admin_surveys.html',subs=subs,tallies=tallies,total=len(subs))
+@app.route('/admin/feedback')
+def admin_feedback():
+ if not session.get('admin_logged_in'): return redirect(url_for('login'))
+ rows=[_doc(d) for d in db.collection('feedback').stream()]
+ for r in rows: r['created_at']=parse_dt(r.get('created_at'))
+ rows.sort(key=lambda r:r['created_at'] or datetime.datetime.min,reverse=True)
+ ratings=[r.get('rating',0) for r in rows]
+ avg=round(sum(ratings)/len(ratings),1) if ratings else 0
+ dist={n:ratings.count(n) for n in range(6)}
+ return render_template('admin_feedback.html',rows=rows,avg=avg,total=len(rows),dist=dist)
+@app.route('/admin/map')
+def admin_map():
+ if not session.get('admin_logged_in'): return redirect(url_for('login'))
+ rng=request.args.get('range','all')
+ if rng not in ('today','week','month','all'): rng='all'
+ now=datetime.datetime.utcnow()
+ comps=[_doc(d) for d in db.collection('complaints').stream()]
+ def in_range(dt):
+  if not dt: return False
+  if rng=='today': return dt.date()==now.date()
+  if rng=='week': return dt>=now-datetime.timedelta(days=7)
+  if rng=='month': return dt>=now-datetime.timedelta(days=30)
+  return True
+ pins=[]
+ for c in comps:
+  dt=parse_dt(c.get('created_at'))
+  if not in_range(dt): continue
+  coords=(c.get('coordinates') or '').split(',')
+  if len(coords)!=2: continue
+  try: lat,lng=float(coords[0]),float(coords[1])
+  except ValueError: continue
+  pins.append({
+   'lat':lat,'lng':lng,'status':c.get('status','Reported'),
+   'title':(c.get('description') or category_label(c.get('category',''),c.get('subcategory',''))or 'Report')[:80],
+   'report_number':c.get('report_number'),'id':c['id'],
+   'created_at':dt.strftime('%d %b %Y') if dt else '',
+  })
+ resolved=sum(1 for p in pins if p['status']=='Resolved')
+ denied=sum(1 for p in pins if p['status']=='Denied')
+ pending=len(pins)-resolved-denied
+ return render_template('admin_map.html',pins=pins,rng=rng,total=len(pins),resolved=resolved,pending=pending,denied=denied)
 @app.route('/update/<complaint_id>',methods=['POST'])
 def update_status(complaint_id):
  if not session.get('admin_logged_in'): return redirect(url_for('login'))
