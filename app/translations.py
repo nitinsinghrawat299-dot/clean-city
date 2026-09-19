@@ -118,6 +118,9 @@ TRANSLATIONS = {
   'sub_sewerage-overflow':'Overflow of Sewerage or Storm Water','sub_stagnant-water':'Stagnant Water on Road / Open Area',
   'sub_septic-overflow':'Overflow of Septic Tanks','sub_dead-animal':'Removal of Dead Animals',
   'sub_other-complaint':'Complaint Other Citizen Make',
+  'cat_citizen':'Complaint a Citizen','citizen_reward_badge':'Earn reward points',
+  'citizen_reward_title':'Genuine complaints can earn a reward',
+  'citizen_reward_text':'If your complaint is found to be genuine after verification, you may be awarded reward points. A clear photo or video and the exact location help the team act quickly.',
 
   # ---- Landing page (marketing copy) ----
   'hero_pill':'📍 Pauri Garhwal • Community Powered',
@@ -259,6 +262,9 @@ TRANSLATIONS = {
   'sub_sewerage-overflow':'सीवरेज या तूफानी पानी का बहाव','sub_stagnant-water':'सड़क/खुले क्षेत्र में जमा पानी',
   'sub_septic-overflow':'सेप्टिक टैंक का बहाव','sub_dead-animal':'मृत पशु हटाना',
   'sub_other-complaint':'अन्य नागरिक शिकायत',
+  'cat_citizen':'नागरिक की शिकायत','citizen_reward_badge':'रिवॉर्ड पॉइंट पाएँ',
+  'citizen_reward_title':'सही शिकायत पर मिल सकता है पुरस्कार',
+  'citizen_reward_text':'यदि सत्यापन के बाद आपकी शिकायत सही पाई जाती है, तो आपको रिवॉर्ड पॉइंट दिए जा सकते हैं। साफ़ फोटो या वीडियो और सही लोकेशन देने से टीम जल्दी कार्रवाई कर पाती है।',
 
   # ---- Landing page (marketing copy) ----
   'hero_pill':'📍 पौड़ी गढ़वाल • सामुदायिक शक्ति',

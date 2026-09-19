@@ -11,6 +11,16 @@
       <p>{{ t('subcategories_subtitle') }}</p>
     </div>
 
+    {% if category.get('reward') %}
+      <div class="reward-note" role="note">
+        <div class="reward-note-icon" aria-hidden="true">🎁</div>
+        <div>
+          <h2>{{ t('citizen_reward_title') }}</h2>
+          <p>{{ t('citizen_reward_text') }}</p>
+        </div>
+      </div>
+    {% endif %}
+
     <div style="display:flex; flex-direction:column; gap:12px;">
       {% for sub_key, sub in category.subcats.items() %}
         <a href="{{ url_for('report_subcategory', cat_key=cat_key, sub_key=sub_key) }}" class="card" style="display:flex; align-items:center; justify-content:space-between; gap:14px; text-decoration:none; color:inherit; padding:18px 22px;">

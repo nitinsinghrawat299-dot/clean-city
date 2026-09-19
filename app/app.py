@@ -74,6 +74,9 @@ cloudinary.config(
 # 'enabled': True subcategories use the existing Snap-Pin-Report form.
 # 'enabled': False subcategories are shown in the menu but are not yet wired up (placeholder page).
 CATEGORIES={
+ 'citizen':{'title':'Complaint a Citizen','icon':'📢','reward':True,'subcats':{
+   'other-complaint':{'title':'Complaint Other Citizen Make','enabled':True,'media_type':'photo_video_voice'},
+ }},
  'waste':{'title':'Waste & Garbage Management','icon':'🗑️','subcats':{
    'dirty-spot':{'title':'Cleanliness Target Unit (Dirty Spot)','enabled':True},
    'garbage-dump':{'title':'Garbage Dump','enabled':True},
@@ -104,7 +107,6 @@ CATEGORIES={
    'stagnant-water':{'title':'Stagnant Water on Road / Open Area','enabled':True},
    'septic-overflow':{'title':'Overflow of Septic Tanks','enabled':True},
    'dead-animal':{'title':'Removal of Dead Animals','enabled':True},
-   'other-complaint':{'title':'Complaint Other Citizen Make','enabled':True,'media_type':'photo_video_voice'},
  }},
 }
 def category_label(cat_key,sub_key):
@@ -172,6 +174,26 @@ def save_media(f,folder='clean-city-reports'):
  result=cloudinary.uploader.upload(f, folder=folder, resource_type='auto')
  return result['secure_url'], result.get('resource_type','image')
 
+# ---- Login-state helpers / navigation ----
+def citizen_is_logged_in():
+ # True only if the session points at a user that still exists; a stale id is dropped.
+ cid=session.get('citizen_id')
+ if not cid: return False
+ try:
+  if db.collection('users').document(cid).get().exists: return True
+ except Exception:
+  return True  # if Firestore hiccups, don't kick a logged-in user out
+ for k in ('citizen_id','citizen_username'): session.pop(k,None)
+ return False
+
+@app.after_request
+def no_cache_html(resp):
+ # Stops the browser showing an old copy of a page (e.g. the login form) from its
+ # back/forward cache, so Back always re-checks whether you are still logged in.
+ if request.endpoint!='static' and resp.mimetype=='text/html':
+  resp.headers['Cache-Control']='no-store, max-age=0'
+ return resp
+
 # ---- Site visit tracking (for the admin "Site Visits" widget) ----
 @app.before_request
 def track_visit():
@@ -198,7 +220,7 @@ def inject_visit_stats():
 
 @app.route('/')
 def home():
- if session.get('citizen_id'): return render_template('categories.html',categories=CATEGORIES)
+ if session.get('citizen_id') and request.args.get('page')!='about': return render_template('categories.html',categories=CATEGORIES)
  users_pts=[u.to_dict().get('points',0) for u in db.collection('users').stream()]
  stats={
   'reports':str(_count(db.collection('complaints'))),
@@ -224,6 +246,7 @@ def report_subcategory(cat_key,sub_key):
  return render_template('report_form.html',cat_key=cat_key,sub_key=sub_key,category=cat,subcategory=sub)
 @app.route('/register',methods=['GET','POST'])
 def register():
+ if citizen_is_logged_in(): return redirect(url_for('home'))
  if request.method=='POST':
   u=request.form.get('username','').strip(); e=request.form.get('email','').strip().lower(); p=request.form.get('password',''); cp=request.form.get('confirm_password','')
   if len(u)<3 or u.lower() in {'admin','administrator','cleancity'}: flash('Please choose a valid username.'); return redirect(url_for('register'))
@@ -239,6 +262,7 @@ def register():
  return render_template('register.html')
 @app.route('/citizen-login',methods=['GET','POST'])
 def citizen_login():
+ if citizen_is_logged_in(): return redirect(url_for('home'))
  if request.method=='POST':
   u=request.form.get('username','').strip(); p=request.form.get('password','')
   snap=next(db.collection('users').where('username','==',u).limit(1).stream(),None)
@@ -281,14 +305,14 @@ def survey():
    answers[q['id']]=v
   if missing:
    flash('Please answer every question before submitting.')
-   return render_template('survey.html',questions=SURVEY_QUESTIONS,answers=answers)
+   return render_template('survey.html',questions=SURVEY_QUESTIONS,answers=answers,show_missing=True)
   db.collection('surveys').document(uuid.uuid4().hex).set({
    'citizen_id':session['citizen_id'],'citizen_username':session.get('citizen_username','Citizen'),
    'answers':answers,'created_at':now_iso(),
   })
   flash('🙏 Thank you — your survey response has been recorded!')
   return redirect(url_for('home'))
- return render_template('survey.html',questions=SURVEY_QUESTIONS,answers={})
+ return render_template('survey.html',questions=SURVEY_QUESTIONS,answers={},show_missing=False)
 @app.route('/feedback',methods=['GET','POST'])
 def feedback_form():
  if not session.get('citizen_id'): return redirect(url_for('citizen_login'))
@@ -338,6 +362,7 @@ def submit():
  flash('🎉 Report received!'); return redirect(url_for('profile'))
 @app.route('/login',methods=['GET','POST'])
 def login():
+ if session.get('admin_logged_in'): return redirect(url_for('admin'))
  if request.method=='POST' and request.form.get('username')==ADMIN_USERNAME and ADMIN_PASSWORD_HASH and check_password_hash(ADMIN_PASSWORD_HASH,request.form.get('password','')): session['admin_logged_in']=True; return redirect(url_for('admin'))
  if request.method=='POST': flash('Wrong municipality username or password.')
  return render_template('login.html')

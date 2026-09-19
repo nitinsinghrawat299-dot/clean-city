@@ -37,10 +37,10 @@
     </a>
     <div class="nav-links">
       <a href="{{ url_for('home') }}#home">{{ t('nav_home') }}</a>
-      <a href="{{ url_for('home') }}#how-it-works">{{ t('nav_how_it_works') }}</a>
+      <a href="{{ url_for('home', page='about') }}#how-it-works">{{ t('nav_how_it_works') }}</a>
       <a href="{{ url_for('leaderboard') }}">{{ t('nav_leaderboard') }}</a>
       <a href="{{ url_for('pauri_garhwal') }}">{{ t('nav_about_pauri') }}</a>
-      <a href="{{ url_for('home') }}#contact">{{ t('nav_contact') }}</a>
+      <a href="{{ url_for('home', page='about') }}#contact">{{ t('nav_contact') }}</a>
     </div>
     <div class="nav-actions">
       <a href="{{ url_for('set_language', lang='hi' if get_lang()=='en' else 'en') }}" class="btn btn-ghost btn-sm" title="Switch language">🌐 {{ t('lang_toggle') }}</a>
@@ -49,6 +49,9 @@
           {{ session.get('citizen_username','?')[:1] | upper }}
         </a>
         <a href="{{ url_for('citizen_logout') }}" class="btn btn-ghost btn-sm">{{ t('nav_logout') }}</a>
+      {% elif session.get('admin_logged_in') %}
+        <a href="{{ url_for('admin') }}" class="btn btn-primary btn-sm">Admin Panel</a>
+        <a href="{{ url_for('logout') }}" class="btn btn-ghost btn-sm">{{ t('nav_logout') }}</a>
       {% else %}
         <a href="{{ url_for('citizen_login') }}" class="btn btn-ghost">{{ t('nav_login') }}</a>
         <a href="{{ url_for('register') }}" class="btn btn-primary">{{ t('nav_signup') }}</a>
@@ -93,7 +96,7 @@
       </div>
       <div>
         <h5>{{ t('footer_product') }}</h5>
-        <a href="{{ url_for('home') }}#how-it-works">{{ t('nav_how_it_works') }}</a>
+        <a href="{{ url_for('home', page='about') }}#how-it-works">{{ t('nav_how_it_works') }}</a>
         <a href="{{ url_for('pauri_garhwal') }}">{{ t('nav_about_pauri') }}</a>
         <a href="{{ url_for('leaderboard') }}">{{ t('nav_leaderboard') }}</a>
       </div>

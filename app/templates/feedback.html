@@ -2,8 +2,8 @@
 {% block title %}Rate Us — SPR{% endblock %}
 
 {% block content %}
-<section style="padding:44px 0;">
-  <div class="wrap" style="max-width:560px;">
+<section style="padding:44px 0 64px;">
+  <div class="wrap fb-shell">
     <div class="dash-header">
       <h1>⭐ Rate Pauri Nagar Palika</h1>
       <p>Tell us how we're doing — your feedback helps the municipality improve.</p>
@@ -11,25 +11,53 @@
 
     <form method="POST" action="{{ url_for('feedback_form') }}" class="card card-lg">
       <div class="field">
-        <label>Your rating</label>
-        <div class="rate-row" id="rateRow">
+        <label id="ratingLabel">How would you rate the services?</label>
+        <div class="fb-scale" role="radiogroup" aria-labelledby="ratingLabel">
+          {% set faces = ['😠','🙁','😕','🙂','😊','🤩'] %}
           {% for n in range(0,6) %}
-            <label class="rate-opt">
+            <label class="fb-opt">
               <input type="radio" name="rating" value="{{ n }}" {{ 'checked' if n==5 }}>
-              <span>{{ n }}</span>
+              <span class="fb-face">
+                <span class="fb-emoji" aria-hidden="true">{{ faces[n] }}</span>
+                <span class="fb-n">{{ n }}</span>
+              </span>
             </label>
           {% endfor %}
         </div>
-        <p class="field-note">0 = very unsatisfied, 5 = excellent</p>
+        <div class="fb-ends"><span>0 = very unsatisfied</span><span>5 = excellent</span></div>
+        <p class="fb-caption" id="fbCaption" aria-live="polite"></p>
       </div>
 
       <div class="field">
         <label for="comment">Your feedback <span style="font-weight:400; color:var(--text-muted);">(optional)</span></label>
         <textarea id="comment" name="comment" maxlength="1000" placeholder="What's working well? What should we improve?"></textarea>
+        <p class="fb-count" id="fbCount">0 / 1000</p>
       </div>
 
       <button type="submit" class="btn btn-primary btn-block">Submit Feedback</button>
     </form>
   </div>
 </section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  var labels = ['Very unsatisfied', 'Unsatisfied', 'Below expectations', 'Okay', 'Good', 'Excellent'];
+  var cap = document.getElementById('fbCaption');
+  var radios = document.querySelectorAll('input[name=rating]');
+  function showRating() {
+    var c = document.querySelector('input[name=rating]:checked');
+    cap.textContent = c ? c.value + ' — ' + labels[parseInt(c.value, 10)] : '';
+  }
+  [].forEach.call(radios, function (r) { r.addEventListener('change', showRating); });
+  showRating();
+
+  var ta = document.getElementById('comment');
+  var cnt = document.getElementById('fbCount');
+  function count() { cnt.textContent = ta.value.length + ' / 1000'; }
+  ta.addEventListener('input', count);
+  count();
+})();
+</script>
 {% endblock %}
