@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{{ t('categories_title') }} — SPR{% endblock %}
+
+{% block content %}
+<section style="padding:44px 0;">
+  <div class="wrap">
+    <div class="dash-header">
+      <h1>{{ t('categories_title') }}</h1>
+      <p>{{ t('categories_subtitle') }}</p>
+    </div>
+
+    <div class="cat-grid">
+      {% for cat_key, cat in categories.items() %}
+        {% set n = cat.subcats|length %}
+        <a href="{{ url_for('report_category', cat_key=cat_key) }}" class="card cat-card{{ ' cat-card--reward' if cat.get('reward') }}">
+          <div class="cat-icon">{{ cat.icon }}</div>
+          <h3>{{ cat_t(cat_key) }}</h3>
+          <p>{{ n }} report type{{ 's' if n != 1 }}</p>
+          {% if cat.get('reward') %}
+            <span class="cat-chip">🎁 {{ t('citizen_reward_badge') }}</span>
+          {% endif %}
+        </a>
+      {% endfor %}
+
+      <a href="{{ url_for('survey') }}" class="card cat-card cat-card--survey">
+        <div class="cat-icon">📋</div>
+        <h3>Cleanliness Survey</h3>
+        <p>Share your experience — 13 quick questions</p>
+      </a>
+      <a href="{{ url_for('feedback_form') }}" class="card cat-card cat-card--rate">
+        <div class="cat-icon">⭐</div>
+        <h3>Rate Nagar Palika</h3>
+        <p>Rate us 0–5 and leave feedback</p>
+      </a>
+    </div>
+  </div>
+</section>
+{% endblock %}

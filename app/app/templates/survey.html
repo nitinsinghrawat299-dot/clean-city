@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Cleanliness Survey — SPR{% endblock %}
+
+{% block content %}
+<section style="padding:44px 0 64px;">
+  <div class="wrap sv-shell">
+    <div class="dash-header">
+      <h1>📋 Citizen Cleanliness Survey</h1>
+      <p>Help Pauri Nagar Palika understand how cleanliness services are working in your area. Choose one answer for each of the {{ questions|length }} questions — all are required.</p>
+    </div>
+
+    <div class="sv-progress" id="svProgress" role="progressbar" aria-valuemin="0" aria-valuemax="{{ questions|length }}" aria-valuenow="0" aria-label="Survey progress">
+      <div class="sv-progress-row">
+        <span id="svCount">0 of {{ questions|length }} answered</span>
+      </div>
+      <div class="sv-bar"><span id="svBar"></span></div>
+    </div>
+
+    <form method="POST" action="{{ url_for('survey') }}" id="surveyForm" novalidate>
+      <div class="sv-list">
+        {% for q in questions %}
+          {% set chosen = answers.get(q.id) %}
+          {% set compact = (q.options|map('length')|max) <= 24 %}
+          <div class="sq{{ ' is-answered' if chosen }}{{ ' is-missing' if show_missing and not chosen }}" id="sq-{{ q.id }}" role="radiogroup" aria-labelledby="sqt-{{ q.id }}">
+            <div class="sq-head">
+              <span class="sq-num" aria-hidden="true">{{ loop.index }}</span>
+              <p class="sq-text" id="sqt-{{ q.id }}">{{ q.text }}</p>
+            </div>
+            <div class="sq-opts{{ ' sq-opts--compact' if compact }}">
+              {% for opt in q.options %}
+                <label class="sq-opt{{ ' is-checked' if chosen == opt }}">
+                  <input type="radio" name="{{ q.id }}" value="{{ opt }}" {{ 'checked' if chosen == opt }}>
+                  <span class="sq-dot" aria-hidden="true"></span>
+                  <span class="sq-label">{{ opt }}</span>
+                </label>
+              {% endfor %}
+            </div>
+            <p class="sq-error">Please choose an answer for this question.</p>
+          </div>
+        {% endfor %}
+      </div>
+
+      <div class="card sv-submit">
+        <p>Your answers are recorded against your account and help the Nagar Palika improve services.</p>
+        <button type="submit" class="btn btn-primary">Submit Survey</button>
+      </div>
+    </form>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  var form = document.getElementById('surveyForm');
+  if (!form) return;
+  var qs = [].slice.call(form.querySelectorAll('.sq'));
+  var total = qs.length;
+  var countEl = document.getElementById('svCount');
+  var bar = document.getElementById('svBar');
+  var prog = document.getElementById('svProgress');
+  var hdr = document.querySelector('header.site-header');
+
+  function setHdr() {
+    if (hdr) document.documentElement.style.setProperty('--hdr-h', hdr.offsetHeight + 'px');
+  }
+  setHdr();
+  window.addEventListener('resize', setHdr);
+
+  function refresh() {
+    var done = 0;
+    qs.forEach(function (q) {
+      var checked = q.querySelector('input:checked');
+      q.classList.toggle('is-answered', !!checked);
+      if (checked) { done++; q.classList.remove('is-missing'); }
+      [].forEach.call(q.querySelectorAll('.sq-opt'), function (l) {
+        l.classList.toggle('is-checked', l.querySelector('input').checked);
+      });
+    });
+    countEl.textContent = done + ' of ' + total + ' answered';
+    bar.style.width = (done / total * 100) + '%';
+    prog.setAttribute('aria-valuenow', done);
+  }
+
+  form.addEventListener('change', refresh);
+  form.addEventListener('submit', function (e) {
+    var first = null;
+    qs.forEach(function (q) {
+      if (!q.querySelector('input:checked')) {
+        q.classList.add('is-missing');
+        if (!first) first = q;
+      }
+    });
+    if (first) {
+      e.preventDefault();
+      first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  });
+
+  refresh();
+  var firstMissing = form.querySelector('.sq.is-missing');
+  if (firstMissing) firstMissing.scrollIntoView({ block: 'center' });
+})();
+</script>
+{% endblock %}
