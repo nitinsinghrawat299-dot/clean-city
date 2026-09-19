@@ -11,14 +11,14 @@
       <div class="field">
         <label for="username">{{ t('username_label') }}</label>
         <div class="input-row">
-          <input type="text" id="username" name="username" value="{{ prefill_username }}" required autofocus placeholder="{{ t('username_label') }}">
+          <input type="text" id="username" name="username" required autofocus placeholder="{{ t('username_label') }}">
         </div>
       </div>
 
       <div class="field">
         <label for="password">{{ t('password_label') }}</label>
         <div class="input-row">
-          <input type="password" id="password" name="password" value="{{ prefill_password }}" required placeholder="{{ t('password_label') }}">
+          <input type="password" id="password" name="password" required placeholder="{{ t('password_label') }}">
           <button type="button" class="toggle-visibility" onclick="const f=document.getElementById('password'); f.type = f.type==='password' ? 'text' : 'password'; this.textContent = f.type==='password' ? '👁️' : '🙈';">👁️</button>
         </div>
       </div>

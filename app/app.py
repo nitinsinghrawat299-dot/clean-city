@@ -335,6 +335,17 @@ def submit():
  cat_key=request.form.get('category',''); sub_key=request.form.get('subcategory','')
  cat=CATEGORIES.get(cat_key); sub=cat['subcats'].get(sub_key) if cat else None
  if not cat or not sub or not sub['enabled']: flash('Please choose a valid, available complaint type.'); return redirect(url_for('home'))
+ coordinates=request.form.get('coordinates','').strip()
+ coord_parts=coordinates.split(',') if coordinates else []
+ valid_coords=False
+ if len(coord_parts)==2:
+  try:
+   lat,lng=float(coord_parts[0]),float(coord_parts[1])
+   valid_coords=(-90<=lat<=90) and (-180<=lng<=180)
+  except ValueError:
+   valid_coords=False
+ if not valid_coords:
+  flash('Please pin a valid location before submitting.'); return redirect(url_for('report_subcategory',cat_key=cat_key,sub_key=sub_key))
  img=''; media_type='image'; audio_url=''
  if sub.get('media_type')=='photo_video_voice':
   f=request.files.get('media')
