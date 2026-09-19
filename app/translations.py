@@ -12,8 +12,8 @@ TRANSLATIONS = {
   'footer_tagline':'Helping citizens of the Garhwal Himalayas report and track local cleanliness issues, one pin at a time.',
   'footer_product':'Product','footer_account':'Account','footer_contact_office':'Contact & Office',
   'footer_rights':'© 2026 Snap Pin Report (SPR). All rights reserved.','footer_made_for':'Made for the hill towns of Pauri Garhwal.',
-  'lang_toggle':'हिन्दी'
   'footer_credit':'Built by Nitin Rawat & Saksham Panwar.',
+  'lang_toggle':'हिन्दी',
 
   # ---- Landing page ----
   'landing_reports':'Reports Filed','landing_users':'Active Citizens','landing_points':'Points Earned','landing_resolved':'Issues Resolved',
@@ -175,8 +175,8 @@ TRANSLATIONS = {
   'footer_tagline':'गढ़वाल हिमालय के नागरिकों को स्थानीय स्वच्छता समस्याओं की रिपोर्ट करने और ट्रैक करने में मदद करना, एक-एक पिन के साथ।',
   'footer_product':'उत्पाद','footer_account':'खाता','footer_contact_office':'संपर्क और कार्यालय',
   'footer_rights':'© 2026 Snap Pin Report (SPR). सर्वाधिकार सुरक्षित।','footer_made_for':'पौड़ी गढ़वाल के पहाड़ी कस्बों के लिए बनाया गया।',
-  'lang_toggle':'English'
   'footer_credit':'निर्माता: नितिन रावत और साक्षम पंवार।',
+  'lang_toggle':'English',
 
   'landing_reports':'दर्ज रिपोर्टें','landing_users':'सक्रिय नागरिक','landing_points':'अर्जित अंक','landing_resolved':'सुलझी समस्याएँ',
 
