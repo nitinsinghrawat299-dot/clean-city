@@ -96,7 +96,9 @@ var I18N={
   voiceMicNotSupported:{{ t('voice_mic_not_supported')|tojson }},
   micDenied:{{ t('mic_denied')|tojson }},
   voiceRecorded:{{ t('voice_recorded')|tojson }},
-  recordingInProgress:{{ t('recording_in_progress')|tojson }}
+  recordingInProgress:{{ t('recording_in_progress')|tojson }},
+  submitting:{{ t('submitting')|tojson }},
+  submitFailed:{{ t('submit_failed')|tojson }}
 };
 (function(){
   var mediaInput=document.getElementById('mediaInput');
@@ -125,7 +127,8 @@ var I18N={
   var audioFileInput=document.getElementById('audioFileInput');
   var map=null, marker=null, hasMedia=false, hasLocation=false;
   var mediaRecorder=null, audioChunks=[];
-  var rawPhotoFile=null, lastLat=null, lastLng=null, lastAddress='';
+  var rawPhotoFile=null, stampedBlob=null, rawVideoFile=null, audioBlob=null;
+  var lastLat=null, lastLng=null, lastAddress='';
 
   function checkReady(){
     if(hasMedia && hasLocation){ submitBtn.disabled=false; submitHint.style.display='none'; }
@@ -222,9 +225,7 @@ var I18N={
 
   function applyStamp(file){
     stampPhoto(file, function(stampedFile){
-      var dt=new DataTransfer();
-      dt.items.add(stampedFile);
-      mediaInput.files=dt.files;
+      stampedBlob=stampedFile;
       var previewUrl=URL.createObjectURL(stampedFile);
       mediaPreviewImg.src=previewUrl; mediaPreviewImg.style.display='block';
       mediaPreviewVid.style.display='none';
@@ -242,7 +243,8 @@ var I18N={
     var f=this.files[0];
     if(!f) return;
     if(f.type.indexOf('video')===0){
-      rawPhotoFile=null;
+      rawPhotoFile=null; stampedBlob=null;
+      rawVideoFile=f;
       var url=URL.createObjectURL(f);
       mediaPreviewVid.src=url; mediaPreviewVid.style.display='block';
       mediaPreviewImg.style.display='none';
@@ -253,13 +255,14 @@ var I18N={
       return;
     }
     // Photos get the GPS/timestamp stamp burned right onto the image, just like the standard report form.
+    rawVideoFile=null;
     rawPhotoFile=f;
     applyStamp(f);
     if(!hasLocation) fetchAndPinLocation();
   });
 
   retakeMediaBtn.addEventListener('click', function(){
-    mediaInput.value=''; rawPhotoFile=null;
+    mediaInput.value=''; rawPhotoFile=null; stampedBlob=null; rawVideoFile=null;
     mediaPreviewImg.style.display='none'; mediaPreviewVid.style.display='none'; mediaPreviewVid.src='';
     mediaPlaceholder.style.display='flex';
     pickMediaBtn.style.display='inline-flex'; retakeMediaBtn.style.display='none';
@@ -279,10 +282,7 @@ var I18N={
       mediaRecorder.onstop=function(){
         stream.getTracks().forEach(function(t){ t.stop(); });
         var blob=new Blob(audioChunks, {type:'audio/webm'});
-        var file=new File([blob], 'voice-note.webm', {type:'audio/webm'});
-        var dt=new DataTransfer();
-        dt.items.add(file);
-        audioFileInput.files=dt.files;
+        audioBlob=new File([blob], 'voice-note.webm', {type:'audio/webm'});
         var url=URL.createObjectURL(blob);
         audioPreview.src=url; audioPreview.style.display='block';
         recordBtn.style.display='none'; stopBtn.style.display='none'; reRecordBtn.style.display='inline-flex';
@@ -301,7 +301,7 @@ var I18N={
   });
 
   reRecordBtn.addEventListener('click', function(){
-    audioFileInput.value='';
+    audioBlob=null;
     audioPreview.style.display='none'; audioPreview.src='';
     recordBtn.style.display='inline-flex'; reRecordBtn.style.display='none';
     recordStatus.textContent='';
@@ -388,6 +388,30 @@ var I18N={
 
   locationInput && locationInput.addEventListener('blur', function(){
     if(rawPhotoFile) applyStamp(rawPhotoFile);
+  });
+
+  // ---------- Submit manually with FormData, so the GPS-stamped photo (and the recorded
+  // voice note) are sent as the actual captured blobs, instead of relying on reassigning
+  // the real <input type=file>, which mobile browsers can silently fail to pick up. ----------
+  var reportForm=document.getElementById('reportForm');
+  reportForm.addEventListener('submit', function(e){
+    e.preventDefault();
+    submitBtn.disabled=true;
+    var originalLabel=submitBtn.textContent;
+    submitBtn.textContent=I18N.submitting || 'Submitting…';
+    var fd=new FormData(reportForm);
+    fd.delete('media'); fd.delete('audio');
+    if(stampedBlob){ fd.append('media', stampedBlob, stampedBlob.name || 'report.jpg'); }
+    else if(rawVideoFile){ fd.append('media', rawVideoFile, rawVideoFile.name || 'report.mp4'); }
+    if(audioBlob){ fd.append('audio', audioBlob, audioBlob.name || 'voice-note.webm'); }
+    fetch(reportForm.action, {method:'POST', body:fd})
+      .then(function(r){ window.location.href=r.url; })
+      .catch(function(){
+        submitBtn.disabled=false;
+        submitBtn.textContent=originalLabel;
+        submitHint.style.display='block';
+        submitHint.textContent=I18N.submitFailed || 'Could not submit — check your connection and try again.';
+      });
   });
 })();
 </script>
