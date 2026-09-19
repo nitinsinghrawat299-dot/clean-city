@@ -35,28 +35,35 @@
       <span class="logo-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M3 19h18"/><path d="M5 19 11 6l3 5.5"/><path d="M11 19 15.5 9 21 19"/><circle cx="15.5" cy="6.2" r="1.15" fill="currentColor" stroke="none"/></svg></span>
       <span>SPR<small>Snap Pin Report</small></span>
     </a>
-    <div class="nav-links">
-      <a href="{{ url_for('home') }}#home">{{ t('nav_home') }}</a>
-      <a href="{{ url_for('home', page='about') }}#how-it-works">{{ t('nav_how_it_works') }}</a>
-      <a href="{{ url_for('leaderboard') }}">{{ t('nav_leaderboard') }}</a>
-      <a href="{{ url_for('resolved_reports') }}">{{ t('nav_resolved') }}</a>
-      <a href="{{ url_for('pauri_garhwal') }}">{{ t('nav_about_pauri') }}</a>
-      <a href="{{ url_for('home', page='about') }}#contact">{{ t('nav_contact') }}</a>
-    </div>
-    <div class="nav-actions">
-      <a href="{{ url_for('set_language', lang='hi' if get_lang()=='en' else 'en') }}" class="btn btn-ghost btn-sm" title="Switch language">🌐 {{ t('lang_toggle') }}</a>
-      {% if session.get('citizen_id') %}
-        <a href="{{ url_for('profile') }}" class="nav-avatar" title="{{ session.get('citizen_username','') }}">
-          {{ session.get('citizen_username','?')[:1] | upper }}
-        </a>
-        <a href="{{ url_for('citizen_logout') }}" class="btn btn-ghost btn-sm">{{ t('nav_logout') }}</a>
-      {% elif session.get('admin_logged_in') %}
-        <a href="{{ url_for('admin') }}" class="btn btn-primary btn-sm">Admin Panel</a>
-        <a href="{{ url_for('logout') }}" class="btn btn-ghost btn-sm">{{ t('nav_logout') }}</a>
-      {% else %}
-        <a href="{{ url_for('citizen_login') }}" class="btn btn-ghost">{{ t('nav_login') }}</a>
-        <a href="{{ url_for('register') }}" class="btn btn-primary">{{ t('nav_signup') }}</a>
-      {% endif %}
+
+    <button type="button" class="nav-toggle" id="navToggle" aria-expanded="false" aria-controls="navCollapse" aria-label="Open menu">
+      <span></span><span></span><span></span>
+    </button>
+
+    <div class="nav-collapse" id="navCollapse">
+      <div class="nav-links">
+        <a href="{{ url_for('home') }}#home">{{ t('nav_home') }}</a>
+        <a href="{{ url_for('home', page='about') }}#how-it-works">{{ t('nav_how_it_works') }}</a>
+        <a href="{{ url_for('leaderboard') }}">{{ t('nav_leaderboard') }}</a>
+        <a href="{{ url_for('resolved_reports') }}">{{ t('nav_resolved') }}</a>
+        <a href="{{ url_for('pauri_garhwal') }}">{{ t('nav_about_pauri') }}</a>
+        <a href="{{ url_for('home', page='about') }}#contact">{{ t('nav_contact') }}</a>
+      </div>
+      <div class="nav-actions">
+        <a href="{{ url_for('set_language', lang='hi' if get_lang()=='en' else 'en') }}" class="btn btn-ghost btn-sm" title="Switch language">🌐 {{ t('lang_toggle') }}</a>
+        {% if session.get('citizen_id') %}
+          <a href="{{ url_for('profile') }}" class="nav-avatar" title="{{ session.get('citizen_username','') }}">
+            {{ session.get('citizen_username','?')[:1] | upper }}
+          </a>
+          <a href="{{ url_for('citizen_logout') }}" class="btn btn-ghost btn-sm">{{ t('nav_logout') }}</a>
+        {% elif session.get('admin_logged_in') %}
+          <a href="{{ url_for('admin') }}" class="btn btn-primary btn-sm">Admin Panel</a>
+          <a href="{{ url_for('logout') }}" class="btn btn-ghost btn-sm">{{ t('nav_logout') }}</a>
+        {% else %}
+          <a href="{{ url_for('citizen_login') }}" class="btn btn-ghost">{{ t('nav_login') }}</a>
+          <a href="{{ url_for('register') }}" class="btn btn-primary">{{ t('nav_signup') }}</a>
+        {% endif %}
+      </div>
     </div>
   </nav>
 </header>
@@ -133,6 +140,49 @@
     toggle();
     window.addEventListener('scroll', toggle, { passive: true });
   }
+
+  // ---- Mobile nav toggle ----
+  (function () {
+    var btn = document.getElementById('navToggle');
+    var panel = document.getElementById('navCollapse');
+    if (!btn || !panel) return;
+
+    function closeMenu() {
+      btn.setAttribute('aria-expanded', 'false');
+      panel.classList.remove('is-open');
+    }
+    function openMenu() {
+      btn.setAttribute('aria-expanded', 'true');
+      panel.classList.add('is-open');
+    }
+
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var expanded = btn.getAttribute('aria-expanded') === 'true';
+      expanded ? closeMenu() : openMenu();
+    });
+
+    // Tapping a link inside the menu closes it (so it doesn't stay open on the next page)
+    panel.addEventListener('click', function (e) {
+      if (e.target.closest('a')) closeMenu();
+    });
+
+    // Tapping outside the open menu closes it
+    document.addEventListener('click', function (e) {
+      if (btn.getAttribute('aria-expanded') === 'true' && !panel.contains(e.target) && e.target !== btn) {
+        closeMenu();
+      }
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closeMenu();
+    });
+
+    // If the window is resized past the mobile breakpoint while open, reset it
+    window.addEventListener('resize', function () {
+      if (window.innerWidth > 900) closeMenu();
+    });
+  })();
 </script>
 </body>
 </html>
