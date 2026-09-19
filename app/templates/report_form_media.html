@@ -29,7 +29,9 @@
               <span>{{ t('media_placeholder') }}</span>
             </div>
           </div>
+          <canvas id="stampCanvas" style="display:none;"></canvas>
           <input type="file" name="media" id="mediaInput" accept="image/*,video/*" capture="environment" required style="display:none;">
+          <p class="field-note" id="stampNote" style="display:none;">{{ t('gps_stamp_note') }}</p>
           <div style="display:flex; gap:10px; margin-top:10px;">
             <button type="button" class="btn btn-primary btn-sm" id="pickMediaBtn">{{ t('choose_media_btn') }}</button>
             <button type="button" class="btn btn-ghost btn-sm" id="retakeMediaBtn" style="display:none;">{{ t('remove_media_btn') }}</button>
@@ -90,6 +92,7 @@ var I18N={
   gettingLocation:{{ t('getting_location')|tojson }},
   locationError:{{ t('location_error')|tojson }},
   addressPlaceholder:{{ t('address_placeholder')|tojson }},
+  defaultLocationTitle:{{ t('default_location_title')|tojson }},
   voiceMicNotSupported:{{ t('voice_mic_not_supported')|tojson }},
   micDenied:{{ t('mic_denied')|tojson }},
   voiceRecorded:{{ t('voice_recorded')|tojson }},
@@ -102,6 +105,8 @@ var I18N={
   var mediaPreviewImg=document.getElementById('mediaPreviewImg');
   var mediaPreviewVid=document.getElementById('mediaPreviewVid');
   var mediaPlaceholder=document.getElementById('mediaPlaceholder');
+  var stampCanvas=document.getElementById('stampCanvas');
+  var stampNote=document.getElementById('stampNote');
   var pinLocationBtn=document.getElementById('pinLocationBtn');
   var mapDiv=document.getElementById('reportMap');
   var mapError=document.getElementById('mapError');
@@ -109,6 +114,7 @@ var I18N={
   var coordinatesInput=document.getElementById('coordinates');
   var addressField=document.getElementById('addressField');
   var addressInput=document.getElementById('address');
+  var locationInput=document.getElementById('location');
   var submitBtn=document.getElementById('submitBtn');
   var submitHint=document.getElementById('submitHint');
   var recordBtn=document.getElementById('recordBtn');
@@ -119,10 +125,114 @@ var I18N={
   var audioFileInput=document.getElementById('audioFileInput');
   var map=null, marker=null, hasMedia=false, hasLocation=false;
   var mediaRecorder=null, audioChunks=[];
+  var rawPhotoFile=null, lastLat=null, lastLng=null, lastAddress='';
 
   function checkReady(){
     if(hasMedia && hasLocation){ submitBtn.disabled=false; submitHint.style.display='none'; }
     else { submitBtn.disabled=true; submitHint.style.display='block'; }
+  }
+
+  // ---------- GPS STAMP (burns location/address/time onto photos, like a GPS camera app) ----------
+  function wrapLines(ctx, text, maxWidth){
+    var words=(text||'').split(' '), lines=[], line='';
+    for(var i=0;i<words.length;i++){
+      var test=line ? line+' '+words[i] : words[i];
+      if(ctx.measureText(test).width > maxWidth && line){ lines.push(line); line=words[i]; }
+      else { line=test; }
+    }
+    if(line) lines.push(line);
+    return lines;
+  }
+
+  function stampPhoto(file, callback){
+    var img=new Image();
+    var url=URL.createObjectURL(file);
+    img.onload=function(){
+      var w=img.naturalWidth, h=img.naturalHeight;
+      stampCanvas.width=w; stampCanvas.height=h;
+      var ctx=stampCanvas.getContext('2d');
+      ctx.drawImage(img,0,0,w,h);
+
+      var pad=Math.max(14, w*0.025);
+      var lineH=Math.max(18, w*0.032);
+      var addrLines=lastAddress ? wrapLinesSetup(ctx, w, lineH) : [];
+      var panelH=Math.max(lineH*3.6, lineH*(2.4+addrLines.length));
+
+      var grad=ctx.createLinearGradient(0,h-panelH,0,h);
+      grad.addColorStop(0,'rgba(10,20,14,0)');
+      grad.addColorStop(0.35,'rgba(8,16,11,0.72)');
+      grad.addColorStop(1,'rgba(6,12,8,0.88)');
+      ctx.fillStyle=grad;
+      ctx.fillRect(0,h-panelH,w,panelH);
+
+      var textX=pad+lineH*0.9, y=h-panelH+lineH*1.15;
+      ctx.font='bold '+(lineH*0.85)+'px Arial';
+      ctx.textAlign='center';
+      ctx.fillText('📍', pad+lineH*0.45, y-lineH*0.08);
+      ctx.textAlign='left';
+
+      ctx.fillStyle='#ffffff';
+      ctx.font='bold '+(lineH*0.95)+'px Arial, sans-serif';
+      var title=(locationInput && locationInput.value.trim()) || I18N.defaultLocationTitle;
+      ctx.fillText(title, textX, y);
+      y+=lineH*1.15;
+
+      ctx.font=(lineH*0.68)+'px Arial, sans-serif';
+      ctx.fillStyle='#d9e7dd';
+      addrLines.forEach(function(line){ ctx.fillText(line, textX, y); y+=lineH*0.82; });
+
+      ctx.fillStyle='#b7c9bd';
+      ctx.font=(lineH*0.62)+'px Arial, sans-serif';
+      if(lastLat!=null && lastLng!=null){
+        ctx.fillText('Lat '+parseFloat(lastLat).toFixed(6)+'°  Long '+parseFloat(lastLng).toFixed(6)+'°', textX, y);
+        y+=lineH*0.8;
+      }
+      var now=new Date();
+      ctx.fillText(now.toLocaleDateString(undefined,{day:'2-digit',month:'short',year:'numeric'})+'  '+now.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'}), textX, y);
+
+      var badgeText='SPR VERIFIED';
+      ctx.font='bold '+(lineH*0.5)+'px Arial, sans-serif';
+      var badgeW=ctx.measureText(badgeText).width+lineH*1.1;
+      var badgeH=lineH*0.9;
+      var bx=w-pad-badgeW, by=h-pad-badgeH;
+      ctx.fillStyle='rgba(74,222,128,0.92)';
+      ctx.beginPath();
+      if(ctx.roundRect){ ctx.roundRect(bx,by,badgeW,badgeH,badgeH/2); } else { ctx.rect(bx,by,badgeW,badgeH); }
+      ctx.fill();
+      ctx.fillStyle='#0a140e';
+      ctx.textAlign='center';
+      ctx.fillText(badgeText, bx+badgeW/2, by+badgeH*0.68);
+      ctx.textAlign='left';
+
+      function wrapLinesSetup(ctx, w, lineH){
+        ctx.font=(lineH*0.68)+'px Arial, sans-serif';
+        return wrapLines(ctx, lastAddress, w-pad*2-lineH*1.8).slice(0,2);
+      }
+
+      URL.revokeObjectURL(url);
+      stampCanvas.toBlob(function(blob){
+        if(!blob){ callback(file); return; }
+        var stampedFile=new File([blob], (file.name||'report')+'-stamped.jpg', {type:'image/jpeg'});
+        callback(stampedFile);
+      }, 'image/jpeg', 0.9);
+    };
+    img.onerror=function(){ callback(file); };
+    img.src=url;
+  }
+
+  function applyStamp(file){
+    stampPhoto(file, function(stampedFile){
+      var dt=new DataTransfer();
+      dt.items.add(stampedFile);
+      mediaInput.files=dt.files;
+      var previewUrl=URL.createObjectURL(stampedFile);
+      mediaPreviewImg.src=previewUrl; mediaPreviewImg.style.display='block';
+      mediaPreviewVid.style.display='none';
+      mediaPlaceholder.style.display='none';
+      pickMediaBtn.style.display='none'; retakeMediaBtn.style.display='inline-flex';
+      stampNote.style.display='block';
+      hasMedia=true; checkReady();
+    });
   }
 
   // ---------- Photo / video attach ----------
@@ -131,24 +241,29 @@ var I18N={
   mediaInput.addEventListener('change', function(){
     var f=this.files[0];
     if(!f) return;
-    var url=URL.createObjectURL(f);
     if(f.type.indexOf('video')===0){
+      rawPhotoFile=null;
+      var url=URL.createObjectURL(f);
       mediaPreviewVid.src=url; mediaPreviewVid.style.display='block';
       mediaPreviewImg.style.display='none';
-    } else {
-      mediaPreviewImg.src=url; mediaPreviewImg.style.display='block';
-      mediaPreviewVid.style.display='none';
+      mediaPlaceholder.style.display='none';
+      stampNote.style.display='none';
+      pickMediaBtn.style.display='none'; retakeMediaBtn.style.display='inline-flex';
+      hasMedia=true; checkReady();
+      return;
     }
-    mediaPlaceholder.style.display='none';
-    pickMediaBtn.style.display='none'; retakeMediaBtn.style.display='inline-flex';
-    hasMedia=true; checkReady();
+    // Photos get the GPS/timestamp stamp burned right onto the image, just like the standard report form.
+    rawPhotoFile=f;
+    applyStamp(f);
+    if(!hasLocation) fetchAndPinLocation();
   });
 
   retakeMediaBtn.addEventListener('click', function(){
-    mediaInput.value='';
+    mediaInput.value=''; rawPhotoFile=null;
     mediaPreviewImg.style.display='none'; mediaPreviewVid.style.display='none'; mediaPreviewVid.src='';
     mediaPlaceholder.style.display='flex';
     pickMediaBtn.style.display='inline-flex'; retakeMediaBtn.style.display='none';
+    stampNote.style.display='none';
     hasMedia=false; checkReady();
   });
 
@@ -201,8 +316,9 @@ var I18N={
     })
     .then(function(r){ return r.json(); })
     .then(function(data){
-      if(data && data.display_name){ addressInput.value = data.display_name; }
+      if(data && data.display_name){ addressInput.value = data.display_name; lastAddress = data.display_name; }
       addressInput.placeholder=I18N.addressPlaceholder;
+      if(rawPhotoFile) applyStamp(rawPhotoFile);
     })
     .catch(function(){
       addressInput.placeholder=I18N.couldNotAutofill;
@@ -211,6 +327,7 @@ var I18N={
 
   function dropPin(lat,lng){
     coordinatesInput.value = lat+','+lng;
+    lastLat=lat; lastLng=lng;
     mapDiv.style.display='block';
     mapError.style.display='none';
     if(typeof L === 'undefined'){
@@ -219,6 +336,7 @@ var I18N={
       mapDiv.style.display='none';
       hasLocation=true; checkReady();
       reverseGeocode(lat,lng);
+      if(rawPhotoFile) applyStamp(rawPhotoFile);
       return;
     }
     try{
@@ -230,9 +348,12 @@ var I18N={
         marker=L.marker([lat,lng],{draggable:true}).addTo(map);
         marker.on('dragend', function(){
           var p=marker.getLatLng();
-          coordinatesInput.value = p.lat.toFixed(6)+','+p.lng.toFixed(6);
+          var plat=p.lat.toFixed(6), plng=p.lng.toFixed(6);
+          coordinatesInput.value = plat+','+plng;
+          lastLat=plat; lastLng=plng;
           locationStatus.textContent=I18N.locationPinnedDrag;
-          reverseGeocode(p.lat.toFixed(6),p.lng.toFixed(6));
+          reverseGeocode(plat,plng);
+          if(rawPhotoFile) applyStamp(rawPhotoFile);
         });
       } else {
         map.setView([lat,lng],16);
@@ -247,9 +368,10 @@ var I18N={
     locationStatus.textContent=I18N.locationPinnedDrag;
     reverseGeocode(lat,lng);
     hasLocation=true; checkReady();
+    if(rawPhotoFile) applyStamp(rawPhotoFile);
   }
 
-  pinLocationBtn.addEventListener('click', function(){
+  function fetchAndPinLocation(){
     if(!navigator.geolocation){
       locationStatus.textContent=I18N.geoNotSupported;
       return;
@@ -260,6 +382,12 @@ var I18N={
     }, function(){
       locationStatus.textContent=I18N.locationError;
     }, {enableHighAccuracy:true, timeout:10000});
+  }
+
+  pinLocationBtn.addEventListener('click', fetchAndPinLocation);
+
+  locationInput && locationInput.addEventListener('blur', function(){
+    if(rawPhotoFile) applyStamp(rawPhotoFile);
   });
 })();
 </script>
