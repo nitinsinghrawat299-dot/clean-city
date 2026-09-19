@@ -4,42 +4,42 @@
 {% block content %}
 <section style="padding:44px 0;">
   <div class="wrap" style="max-width:640px;">
-    <a href="{{ url_for('report_category', cat_key=cat_key) }}" class="btn btn-ghost btn-sm" style="margin-bottom:18px;">← {{ t('nav_home') if False else 'Back' }}</a>
+    <a href="{{ url_for('report_category', cat_key=cat_key) }}" class="btn btn-ghost btn-sm" style="margin-bottom:18px;">← {{ t('back') }}</a>
 
     <div class="dash-header">
       <h1>{{ category.icon }} {{ sub_t(sub_key) }}</h1>
-      <p>{{ t('report_form_lede') }}</p>
+      <p>{{ t('media_form_lede') }}</p>
     </div>
 
     <form method="POST" action="{{ url_for('submit') }}" enctype="multipart/form-data" id="reportForm">
       <input type="hidden" name="category" value="{{ cat_key }}">
       <input type="hidden" name="subcategory" value="{{ sub_key }}">
       <input type="hidden" name="coordinates" id="coordinates" value="">
+      <input type="file" name="audio" id="audioFileInput" style="display:none;">
 
       <div class="card card-lg">
 
-        {% if subcategory.get('requires_photo', True) %}
         <div class="field">
-          <label>1. {{ t('step_photo') }}</label>
-          <div class="photo-capture" id="photoCapture">
-            <img id="photoPreview" alt="Captured photo" style="display:none;">
-            <div id="photoPlaceholder" class="photo-placeholder">
-              <span style="font-size:2rem;">📷</span>
-              <span>{{ t('step_photo_hint') }}</span>
+          <label>1. {{ t('step_media') }}</label>
+          <div class="photo-capture" id="mediaCapture">
+            <img id="mediaPreviewImg" alt="Attached photo" style="display:none;">
+            <video id="mediaPreviewVid" controls style="display:none; width:100%; max-height:320px; border-radius:var(--radius-sm);"></video>
+            <div id="mediaPlaceholder" class="photo-placeholder">
+              <span style="font-size:2rem;">📷🎥</span>
+              <span>{{ t('media_placeholder') }}</span>
             </div>
           </div>
           <canvas id="stampCanvas" style="display:none;"></canvas>
-          <input type="file" name="image" id="imageInput" accept="image/*" capture="environment" required style="display:none;">
+          <input type="file" name="media" id="mediaInput" accept="image/*,video/*" capture="environment" required style="display:none;">
           <p class="field-note" id="stampNote" style="display:none;">{{ t('gps_stamp_note') }}</p>
           <div style="display:flex; gap:10px; margin-top:10px;">
-            <button type="button" class="btn btn-primary btn-sm" id="takePhotoBtn">{{ t('open_camera') }}</button>
-            <button type="button" class="btn btn-ghost btn-sm" id="retakeBtn" style="display:none;">{{ t('retake') }}</button>
+            <button type="button" class="btn btn-primary btn-sm" id="pickMediaBtn">{{ t('choose_media_btn') }}</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="retakeMediaBtn" style="display:none;">{{ t('remove_media_btn') }}</button>
           </div>
         </div>
-        {% endif %}
 
         <div class="field">
-          <label>{{ '2' if subcategory.get('requires_photo', True) else '1' }}. {{ t('step_location') }}</label>
+          <label>2. {{ t('step_location') }}</label>
           <p class="field-note" id="locationStatus">{{ t('no_location_pinned') }}</p>
           <button type="button" class="btn btn-primary btn-sm" id="pinLocationBtn" style="margin-bottom:12px;">{{ t('pin_my_location') }}</button>
           <div id="reportMap" class="report-map" style="display:none;"></div>
@@ -52,8 +52,19 @@
         </div>
 
         <div class="field">
-          <label for="description">{{ '3' if subcategory.get('requires_photo', True) else '2' }}. {{ t('step_description') }}</label>
-          <textarea id="description" name="description" required maxlength="1000" placeholder="{{ t('description_placeholder') }}"></textarea>
+          <label>3. {{ t('step_voice') }} <span style="font-weight:400; color:var(--text-faint);">{{ t('optional') }}</span></label>
+          <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <button type="button" class="btn btn-primary btn-sm" id="recordBtn">{{ t('record_voice') }}</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="stopBtn" style="display:none;">{{ t('stop_recording') }}</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="reRecordBtn" style="display:none;">{{ t('re_record') }}</button>
+          </div>
+          <audio id="audioPreview" controls style="display:none; margin-top:10px; width:100%;"></audio>
+          <p class="field-note" id="recordStatus"></p>
+        </div>
+
+        <div class="field">
+          <label for="description">{{ t('step_description') }} <span style="font-weight:400; color:var(--text-faint);">{{ t('description_optional_hint') }}</span></label>
+          <textarea id="description" name="description" maxlength="1000" placeholder="{{ t('description_placeholder') }}"></textarea>
         </div>
 
         <div class="field">
@@ -62,7 +73,7 @@
         </div>
 
         <button type="submit" class="btn btn-primary btn-block" id="submitBtn" disabled>{{ t('submit_report') }}</button>
-        <p class="field-note" id="submitHint" style="text-align:center; margin-top:10px;">{{ t('submit_hint_photo') }}</p>
+        <p class="field-note" id="submitHint" style="text-align:center; margin-top:10px;">{{ t('submit_hint_media') }}</p>
       </div>
     </form>
   </div>
@@ -71,12 +82,29 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+var I18N={
+  lookingUpAddress:{{ t('looking_up_address')|tojson }},
+  couldNotAutofill:{{ t('could_not_autofill_address')|tojson }},
+  mapLoadError1:{{ t('map_load_error_1')|tojson }},
+  mapLoadError2:{{ t('map_load_error_2')|tojson }},
+  locationPinnedDrag:{{ t('location_pinned')|tojson }},
+  geoNotSupported:{{ t('geolocation_not_supported')|tojson }},
+  gettingLocation:{{ t('getting_location')|tojson }},
+  locationError:{{ t('location_error')|tojson }},
+  addressPlaceholder:{{ t('address_placeholder')|tojson }},
+  defaultLocationTitle:{{ t('default_location_title')|tojson }},
+  voiceMicNotSupported:{{ t('voice_mic_not_supported')|tojson }},
+  micDenied:{{ t('mic_denied')|tojson }},
+  voiceRecorded:{{ t('voice_recorded')|tojson }},
+  recordingInProgress:{{ t('recording_in_progress')|tojson }}
+};
 (function(){
-  var imageInput=document.getElementById('imageInput');
-  var takePhotoBtn=document.getElementById('takePhotoBtn');
-  var retakeBtn=document.getElementById('retakeBtn');
-  var photoPreview=document.getElementById('photoPreview');
-  var photoPlaceholder=document.getElementById('photoPlaceholder');
+  var mediaInput=document.getElementById('mediaInput');
+  var pickMediaBtn=document.getElementById('pickMediaBtn');
+  var retakeMediaBtn=document.getElementById('retakeMediaBtn');
+  var mediaPreviewImg=document.getElementById('mediaPreviewImg');
+  var mediaPreviewVid=document.getElementById('mediaPreviewVid');
+  var mediaPlaceholder=document.getElementById('mediaPlaceholder');
   var stampCanvas=document.getElementById('stampCanvas');
   var stampNote=document.getElementById('stampNote');
   var pinLocationBtn=document.getElementById('pinLocationBtn');
@@ -89,16 +117,22 @@
   var locationInput=document.getElementById('location');
   var submitBtn=document.getElementById('submitBtn');
   var submitHint=document.getElementById('submitHint');
-  var photoRequired={{ 'true' if subcategory.get('requires_photo', True) else 'false' }};
-  var map=null, marker=null, hasPhoto=!photoRequired, hasLocation=false;
+  var recordBtn=document.getElementById('recordBtn');
+  var stopBtn=document.getElementById('stopBtn');
+  var reRecordBtn=document.getElementById('reRecordBtn');
+  var audioPreview=document.getElementById('audioPreview');
+  var recordStatus=document.getElementById('recordStatus');
+  var audioFileInput=document.getElementById('audioFileInput');
+  var map=null, marker=null, hasMedia=false, hasLocation=false;
+  var mediaRecorder=null, audioChunks=[];
   var rawPhotoFile=null, lastLat=null, lastLng=null, lastAddress='';
 
   function checkReady(){
-    if(hasPhoto && hasLocation){ submitBtn.disabled=false; submitHint.style.display='none'; }
+    if(hasMedia && hasLocation){ submitBtn.disabled=false; submitHint.style.display='none'; }
     else { submitBtn.disabled=true; submitHint.style.display='block'; }
   }
 
-  // ---------- GPS STAMP (burns location/address/time onto the photo, like a GPS camera app) ----------
+  // ---------- GPS STAMP (burns location/address/time onto photos, like a GPS camera app) ----------
   function wrapLines(ctx, text, maxWidth){
     var words=(text||'').split(' '), lines=[], line='';
     for(var i=0;i<words.length;i++){
@@ -119,7 +153,6 @@
       var ctx=stampCanvas.getContext('2d');
       ctx.drawImage(img,0,0,w,h);
 
-      // panel sizing scales with the photo so it looks right on any resolution
       var pad=Math.max(14, w*0.025);
       var lineH=Math.max(18, w*0.032);
       var addrLines=lastAddress ? wrapLinesSetup(ctx, w, lineH) : [];
@@ -133,7 +166,6 @@
       ctx.fillRect(0,h-panelH,w,panelH);
 
       var textX=pad+lineH*0.9, y=h-panelH+lineH*1.15;
-      // location pin marker
       ctx.font='bold '+(lineH*0.85)+'px Arial';
       ctx.textAlign='center';
       ctx.fillText('📍', pad+lineH*0.45, y-lineH*0.08);
@@ -158,7 +190,6 @@
       var now=new Date();
       ctx.fillText(now.toLocaleDateString(undefined,{day:'2-digit',month:'short',year:'numeric'})+'  '+now.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'}), textX, y);
 
-      // small "verified" badge, bottom-right
       var badgeText='SPR VERIFIED';
       ctx.font='bold '+(lineH*0.5)+'px Arial, sans-serif';
       var badgeW=ctx.measureText(badgeText).width+lineH*1.1;
@@ -193,33 +224,90 @@
     stampPhoto(file, function(stampedFile){
       var dt=new DataTransfer();
       dt.items.add(stampedFile);
-      imageInput.files=dt.files;
+      mediaInput.files=dt.files;
       var previewUrl=URL.createObjectURL(stampedFile);
-      photoPreview.src=previewUrl; photoPreview.style.display='block';
-      photoPlaceholder.style.display='none';
-      takePhotoBtn.style.display='none'; retakeBtn.style.display='inline-flex';
+      mediaPreviewImg.src=previewUrl; mediaPreviewImg.style.display='block';
+      mediaPreviewVid.style.display='none';
+      mediaPlaceholder.style.display='none';
+      pickMediaBtn.style.display='none'; retakeMediaBtn.style.display='inline-flex';
       stampNote.style.display='block';
-      hasPhoto=true; checkReady();
+      hasMedia=true; checkReady();
     });
   }
 
-  takePhotoBtn && takePhotoBtn.addEventListener('click', function(){ imageInput.click(); });
+  // ---------- Photo / video attach ----------
+  pickMediaBtn.addEventListener('click', function(){ mediaInput.click(); });
 
-  imageInput && imageInput.addEventListener('change', function(){
+  mediaInput.addEventListener('change', function(){
     var f=this.files[0];
     if(!f) return;
+    if(f.type.indexOf('video')===0){
+      rawPhotoFile=null;
+      var url=URL.createObjectURL(f);
+      mediaPreviewVid.src=url; mediaPreviewVid.style.display='block';
+      mediaPreviewImg.style.display='none';
+      mediaPlaceholder.style.display='none';
+      stampNote.style.display='none';
+      pickMediaBtn.style.display='none'; retakeMediaBtn.style.display='inline-flex';
+      hasMedia=true; checkReady();
+      return;
+    }
+    // Photos get the GPS/timestamp stamp burned right onto the image, just like the standard report form.
     rawPhotoFile=f;
     applyStamp(f);
+    if(!hasLocation) fetchAndPinLocation();
   });
 
-  retakeBtn && retakeBtn.addEventListener('click', function(){
-    imageInput.value=''; rawPhotoFile=null;
-    photoPreview.style.display='none'; photoPlaceholder.style.display='flex';
-    takePhotoBtn.style.display='inline-flex'; retakeBtn.style.display='none';
+  retakeMediaBtn.addEventListener('click', function(){
+    mediaInput.value=''; rawPhotoFile=null;
+    mediaPreviewImg.style.display='none'; mediaPreviewVid.style.display='none'; mediaPreviewVid.src='';
+    mediaPlaceholder.style.display='flex';
+    pickMediaBtn.style.display='inline-flex'; retakeMediaBtn.style.display='none';
     stampNote.style.display='none';
-    hasPhoto=false; checkReady();
+    hasMedia=false; checkReady();
   });
 
+  // ---------- Voice message recording ----------
+  recordBtn.addEventListener('click', function(){
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      recordStatus.textContent=I18N.voiceMicNotSupported; return;
+    }
+    navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+      audioChunks=[];
+      mediaRecorder=new MediaRecorder(stream);
+      mediaRecorder.ondataavailable=function(e){ if(e.data.size>0) audioChunks.push(e.data); };
+      mediaRecorder.onstop=function(){
+        stream.getTracks().forEach(function(t){ t.stop(); });
+        var blob=new Blob(audioChunks, {type:'audio/webm'});
+        var file=new File([blob], 'voice-note.webm', {type:'audio/webm'});
+        var dt=new DataTransfer();
+        dt.items.add(file);
+        audioFileInput.files=dt.files;
+        var url=URL.createObjectURL(blob);
+        audioPreview.src=url; audioPreview.style.display='block';
+        recordBtn.style.display='none'; stopBtn.style.display='none'; reRecordBtn.style.display='inline-flex';
+        recordStatus.textContent=I18N.voiceRecorded;
+      };
+      mediaRecorder.start();
+      recordBtn.style.display='none'; stopBtn.style.display='inline-flex';
+      recordStatus.textContent=I18N.recordingInProgress;
+    }).catch(function(){
+      recordStatus.textContent=I18N.micDenied;
+    });
+  });
+
+  stopBtn.addEventListener('click', function(){
+    if(mediaRecorder && mediaRecorder.state!=='inactive') mediaRecorder.stop();
+  });
+
+  reRecordBtn.addEventListener('click', function(){
+    audioFileInput.value='';
+    audioPreview.style.display='none'; audioPreview.src='';
+    recordBtn.style.display='inline-flex'; reRecordBtn.style.display='none';
+    recordStatus.textContent='';
+  });
+
+  // ---------- Location pin (same pattern as the standard report form) ----------
   function reverseGeocode(lat,lng){
     addressField.style.display='block';
     addressInput.placeholder=I18N.lookingUpAddress;
@@ -283,7 +371,7 @@
     if(rawPhotoFile) applyStamp(rawPhotoFile);
   }
 
-  pinLocationBtn.addEventListener('click', function(){
+  function fetchAndPinLocation(){
     if(!navigator.geolocation){
       locationStatus.textContent=I18N.geoNotSupported;
       return;
@@ -294,9 +382,11 @@
     }, function(){
       locationStatus.textContent=I18N.locationError;
     }, {enableHighAccuracy:true, timeout:10000});
-  });
+  }
 
-  locationInput.addEventListener('blur', function(){
+  pinLocationBtn.addEventListener('click', fetchAndPinLocation);
+
+  locationInput && locationInput.addEventListener('blur', function(){
     if(rawPhotoFile) applyStamp(rawPhotoFile);
   });
 })();
