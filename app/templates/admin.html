@@ -63,6 +63,7 @@
           <td>
             <div class="row-actions">
               <form method="POST" action="{{ url_for('update_status', complaint_id=c.id) }}" class="status-form" style="display:flex; gap:6px; align-items:center;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="cat_key" value="{{ cat_key or '' }}">
                 <select name="status" class="search-input" style="min-width:120px; padding:6px 10px;" onchange="toggleReason(this)">
                   <option value="Reported" {{ 'selected' if c.status=='Reported' }}>{{ t('status_reported') }}</option>
@@ -74,6 +75,7 @@
                 <button type="submit" class="icon-btn" title="{{ t('update_status') }}">✔</button>
               </form>
               <form method="POST" action="{{ url_for('delete_complaint', complaint_id=c.id) }}" onsubmit="return confirm('{{ t('delete_confirm') }}');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="cat_key" value="{{ cat_key or '' }}">
                 <button type="submit" class="icon-btn danger" title="{{ t('delete_report') }}">🗑</button>
               </form>

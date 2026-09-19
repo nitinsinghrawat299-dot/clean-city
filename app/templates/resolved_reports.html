@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}{{ t('resolved_reports_title') }} — SPR{% endblock %}
+
+{% block content %}
+<section style="padding:44px 0 64px;">
+  <div class="wrap">
+    <div class="dash-header">
+      <h1>✅ {{ t('resolved_reports_title') }}</h1>
+      <p>{{ t('resolved_reports_subtitle') }}</p>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat-chip"><div class="num">{{ total }}</div><div class="label">{{ t('resolved_total') }}</div></div>
+      <div class="stat-chip"><div class="num">{{ rated_count }}</div><div class="label">{{ t('resolved_rated') }}</div></div>
+      <div class="stat-chip"><div class="num">{{ avg_rating if avg_rating else '—' }}</div><div class="label">{{ t('resolved_avg_rating') }}</div></div>
+    </div>
+
+    {% if complaints %}
+      <div class="cat-grid">
+        {% for c in complaints %}
+          <div class="card resolved-card">
+            {% if c.resolution_photo %}
+              <img src="{{ c.resolution_photo }}" alt="{{ t('resolved_reports_title') }}" class="resolved-card-photo">
+            {% elif c.image and c.media_type != 'video' %}
+              <img src="{{ c.image }}" alt="{{ t('resolved_reports_title') }}" class="resolved-card-photo">
+            {% endif %}
+            <div class="resolved-card-body">
+              {% if c.category %}<div style="font-size:.76rem; color:var(--text-muted); margin-bottom:4px;">{{ category_label(c.category, c.subcategory) }}</div>{% endif %}
+              <h4 style="font-size:.95rem; margin-bottom:4px;">{{ (c.description or '')[:70] }}{{ '…' if c.description and c.description|length > 70 }}</h4>
+              <p style="font-size:.8rem; color:var(--text-muted); margin-bottom:10px;">📍 {{ c.location or c.address or '—' }}</p>
+              {% if c.rating %}
+                <span class="star-display">{% for n in range(1,6) %}<span style="color:{{ 'var(--brass)' if n <= c.rating else 'var(--border)' }};">★</span>{% endfor %}</span>
+                {% if c.rating_comment %}<p style="font-size:.82rem; color:var(--text-main); margin-top:8px; font-style:italic; line-height:1.45;">"{{ c.rating_comment }}"</p>{% endif %}
+                <p style="font-size:.74rem; color:var(--text-faint); margin-top:8px;">— {{ c.citizen_username or 'Citizen' }}</p>
+              {% else %}
+                <p style="font-size:.8rem; color:var(--text-faint);">{{ t('awaiting_rating') }}</p>
+              {% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <div class="ic">🧹</div>
+        <p>{{ t('no_resolved_reports') }}</p>
+      </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

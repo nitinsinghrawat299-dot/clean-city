@@ -103,6 +103,17 @@ TRANSLATIONS = {
   'reason_placeholder':'Reason (if denying)',
   'status_reported':'Reported','status_in_progress':'In Progress','status_resolved':'Resolved','status_denied':'Denied',
 
+  # ---- Resolution photo & citizen ratings ----
+  'nav_resolved':'Resolved Reports',
+  'resolved_reports_title':'Resolved Reports','resolved_reports_subtitle':"See how citizens' reports were fixed, and what people are saying.",
+  'resolved_total':'Issues Resolved','resolved_rated':'Rated by Citizens','resolved_avg_rating':'Average Rating',
+  'no_resolved_reports':'No issues have been marked resolved yet — check back soon.',
+  'resolution_photo_label':'Resolution photo (required to mark Resolved)',
+  'resolution_photo_hint':'Upload a photo proving the issue has been fixed. The citizen who filed this report will be able to rate it.',
+  'citizen_rating_header':'Resolution & Citizen Rating','awaiting_rating':"Awaiting the citizen's rating.",
+  'rate_this_resolution':'This report was resolved — rate how it was handled:',
+  'your_rating_label':'Your rating','rating_comment_placeholder':'Tell us more (optional)','submit_rating_btn':'Submit Rating',
+
   # ---- Category & subcategory names ----
   'cat_waste':'Waste & Garbage Management','cat_infra':'Public Infrastructure & Street Maintenance',
   'cat_toilet':'Public Toilet & Sanitation Issues','cat_water':'Water, Drainage & Miscellaneous',
@@ -247,6 +258,16 @@ TRANSLATIONS = {
   'reported_by':'रिपोर्ट करने वाला','update_status':'स्थिति अपडेट करें','delete_report':'रिपोर्ट हटाएँ','no_reports_admin':'अभी तक कोई रिपोर्ट नहीं है। नई नागरिक रिपोर्टें यहाँ दिखाई देंगी।',
   'reason_placeholder':'कारण (यदि अस्वीकार कर रहे हैं)',
   'status_reported':'रिपोर्ट की गई','status_in_progress':'प्रगति में','status_resolved':'सुलझाई गई','status_denied':'अस्वीकृत',
+
+  'nav_resolved':'सुलझी रिपोर्टें',
+  'resolved_reports_title':'सुलझी हुई रिपोर्टें','resolved_reports_subtitle':'देखें कि नागरिकों की रिपोर्टों को कैसे ठीक किया गया, और लोग क्या कह रहे हैं।',
+  'resolved_total':'सुलझाई गई समस्याएँ','resolved_rated':'नागरिकों द्वारा रेट की गईं','resolved_avg_rating':'औसत रेटिंग',
+  'no_resolved_reports':'अभी तक कोई समस्या सुलझाई गई नहीं है — जल्द ही वापस देखें।',
+  'resolution_photo_label':'समाधान फ़ोटो (सुलझाई गई के रूप में चिह्नित करने के लिए आवश्यक)',
+  'resolution_photo_hint':'यह साबित करने वाली फ़ोटो अपलोड करें कि समस्या ठीक हो गई है। जिस नागरिक ने यह रिपोर्ट दर्ज की थी वह इसे रेट कर सकेगा।',
+  'citizen_rating_header':'समाधान और नागरिक रेटिंग','awaiting_rating':'नागरिक की रेटिंग का इंतज़ार है।',
+  'rate_this_resolution':'यह रिपोर्ट सुलझा दी गई — बताएं इसे कैसे संभाला गया:',
+  'your_rating_label':'आपकी रेटिंग','rating_comment_placeholder':'हमें और बताएं (वैकल्पिक)','submit_rating_btn':'रेटिंग सबमिट करें',
 
   # ---- Category & subcategory names ----
   'cat_waste':'कचरा व सफाई प्रबंधन','cat_infra':'सार्वजनिक बुनियादी ढाँचा व सड़क रखरखाव',

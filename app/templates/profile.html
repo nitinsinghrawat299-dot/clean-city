@@ -49,6 +49,33 @@
                   {% if c.status == 'Denied' and c.denial_reason %}
                     <p style="color:#ff9a9d;">{{ t('denied_label') }}: {{ c.denial_reason }}</p>
                   {% endif %}
+                  {% if c.status == 'Resolved' %}
+                    <div style="margin-top:10px; padding-top:10px; border-top:1px dashed var(--border);">
+                      {% if c.resolution_photo %}
+                        <img src="{{ c.resolution_photo }}" alt="Resolved" class="resolution-photo-sm">
+                      {% endif %}
+                      {% if c.rating %}
+                        <div style="font-size:.82rem; color:var(--text-muted);">
+                          {{ t('your_rating_label') }}:
+                          <span class="star-display">{% for n in range(1,6) %}<span style="color:{{ 'var(--brass)' if n <= c.rating else 'var(--border)' }};">★</span>{% endfor %}</span>
+                        </div>
+                        {% if c.rating_comment %}<p style="font-size:.8rem; color:var(--text-faint); margin-top:4px; font-style:italic;">"{{ c.rating_comment }}"</p>{% endif %}
+                      {% else %}
+                        <form method="POST" action="{{ url_for('rate_complaint', complaint_id=c.id) }}" style="margin-top:4px;">
+                          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                          <label style="font-size:.8rem; font-weight:600; display:block; margin-bottom:4px;">{{ t('rate_this_resolution') }}</label>
+                          <div class="star-input" role="radiogroup" aria-label="{{ t('your_rating_label') }}">
+                            {% for n in range(5,0,-1) %}
+                              <input type="radio" id="star{{ n }}_{{ c.id }}" name="rating" value="{{ n }}" {{ 'checked' if n==5 }} required>
+                              <label for="star{{ n }}_{{ c.id }}">★</label>
+                            {% endfor %}
+                          </div>
+                          <textarea name="comment" maxlength="500" rows="2" placeholder="{{ t('rating_comment_placeholder') }}" class="search-input" style="margin-top:6px; width:100%; resize:vertical;"></textarea>
+                          <button type="submit" class="btn btn-primary btn-sm" style="margin-top:6px;">{{ t('submit_rating_btn') }}</button>
+                        </form>
+                      {% endif %}
+                    </div>
+                  {% endif %}
                 </div>
                 <span class="status status-{{ c.status | lower | replace(' ', '') }}">{{ c.status }}</span>
               </div>
@@ -79,6 +106,7 @@
           <h3 style="font-size:1rem; margin-bottom:8px; color:#ff9a9d;">{{ t('delete_account') }}</h3>
           <p style="color:var(--text-muted); font-size:.85rem; margin-bottom:14px;">{{ t('delete_account_warning') }}</p>
           <form method="POST" action="{{ url_for('delete_account') }}" onsubmit="return confirm('Are you sure? This cannot be undone.');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="field">
               <label for="delete_password">{{ t('confirm_your_password') }}</label>
               <input type="password" id="delete_password" name="password" required placeholder="{{ t('password_label') }}">

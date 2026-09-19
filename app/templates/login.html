@@ -22,6 +22,7 @@
     <p class="sub">{{ t('staff_access_subtitle') }}</p>
 
     <form method="POST" action="{{ url_for('login') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="field">
         <label for="username">{{ t('username_label') }}</label>
         <input type="text" id="username" name="username" required autofocus placeholder="{{ t('username_label') }}">

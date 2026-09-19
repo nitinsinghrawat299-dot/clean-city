@@ -5,15 +5,35 @@ import cloudinary, cloudinary.uploader
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
+from flask_wtf import CSRFProtect
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from translations import TRANSLATIONS
 
 load_dotenv(); BASE=os.path.dirname(os.path.abspath(__file__))
 app=Flask(__name__); app.secret_key=os.getenv('SECRET_KEY','clean-city-local-secret-change-me')
 app.jinja_env.globals['category_label']=lambda ck,sk: category_label(ck,sk)
 app.config['PERMANENT_SESSION_LIFETIME']=datetime.timedelta(days=14)
+# CSRF tokens are tied to the session, not a fixed clock; a long photo/GPS capture
+# session (report form) shouldn't expire mid-fill, so don't time-box the token itself.
+app.config['WTF_CSRF_TIME_LIMIT']=None
 ALLOWED={'png','jpg','jpeg','gif','webp'}
 ALLOWED_VIDEO={'mp4','mov','webm','mkv','3gp'}
 ADMIN_USERNAME=os.getenv('ADMIN_USERNAME','admin'); ADMIN_PASSWORD_HASH=os.getenv('ADMIN_PASSWORD_HASH','')
+
+# ---- CSRF protection (every POST form must include {{ csrf_token() }}) ----
+csrf=CSRFProtect(app)
+
+# ---- Rate limiting (brute-force protection on login endpoints) ----
+# In-memory storage: fine for a single Cloud Run instance, but limits are per-instance
+# and reset on restart/scale-out. Move to a shared store (e.g. Redis) if traffic grows
+# enough that Cloud Run runs multiple concurrent instances.
+limiter=Limiter(get_remote_address, app=app, default_limits=[])
+
+@app.errorhandler(429)
+def ratelimit_handler(e):
+ flash('Too many attempts — please wait a minute and try again.')
+ return redirect(request.referrer or url_for('home')), 429
 
 # ---- Language / translation ----
 def get_lang(): return session.get('lang','en')
@@ -261,6 +281,7 @@ def register():
   session['prefill_username']=u; session['prefill_password']=p; flash('Account created!'); return redirect(url_for('citizen_login'))
  return render_template('register.html')
 @app.route('/citizen-login',methods=['GET','POST'])
+@limiter.limit('5 per minute;20 per hour',methods=['POST'])
 def citizen_login():
  if citizen_is_logged_in(): return redirect(url_for('home'))
  if request.method=='POST':
@@ -372,6 +393,7 @@ def submit():
  })
  flash('🎉 Report received!'); return redirect(url_for('profile'))
 @app.route('/login',methods=['GET','POST'])
+@limiter.limit('5 per minute;20 per hour',methods=['POST'])
 def login():
  if session.get('admin_logged_in'): return redirect(url_for('admin'))
  if request.method=='POST' and request.form.get('username')==ADMIN_USERNAME and ADMIN_PASSWORD_HASH and check_password_hash(ADMIN_PASSWORD_HASH,request.form.get('password','')): session['admin_logged_in']=True; return redirect(url_for('admin'))
@@ -495,12 +517,40 @@ def update_status(complaint_id):
  if not session.get('admin_logged_in'): return redirect(url_for('login'))
  s=request.form.get('status','Reported'); r=request.form.get('reason','').strip(); cat_key=request.form.get('cat_key','')
  ref=db.collection('complaints').document(complaint_id); c=_doc(ref.get())
- if c and s=='Resolved' and c.get('status')!='Resolved' and not c.get('points_awarded'):
-  db.collection('users').document(c['citizen_id']).update({'points':firestore.Increment(10)})
-  ref.update({'status':'Resolved','points_awarded':10})
+ if c and s=='Resolved' and c.get('status')!='Resolved':
+  photo=request.files.get('resolution_photo')
+  if not (photo and photo.filename and allowed(photo.filename)):
+   flash('Please attach a photo showing the issue has been resolved before marking this report Resolved.')
+   return redirect(url_for('admin_report_detail',complaint_id=complaint_id,from_cat=cat_key))
+  update_data={'status':'Resolved','resolution_photo':save_image(photo),'resolved_at':now_iso()}
+  if not c.get('points_awarded'):
+   db.collection('users').document(c['citizen_id']).update({'points':firestore.Increment(10)})
+   update_data['points_awarded']=10
+  ref.update(update_data)
  elif c:
   ref.update({'status':s,'denial_reason':r if s=='Denied' else c.get('denial_reason','')})
  return redirect(url_for('admin_reports',cat_key=cat_key) if cat_key else url_for('admin'))
+@app.route('/rate/<complaint_id>',methods=['POST'])
+def rate_complaint(complaint_id):
+ if not session.get('citizen_id'): return redirect(url_for('citizen_login'))
+ ref=db.collection('complaints').document(complaint_id); c=_doc(ref.get())
+ if not c or c.get('citizen_id')!=session['citizen_id'] or c.get('status')!='Resolved':
+  flash('That report cannot be rated.'); return redirect(url_for('profile'))
+ try: rating=int(request.form.get('rating',''))
+ except (TypeError,ValueError): rating=None
+ if rating is None or rating<1 or rating>5:
+  flash('Please choose a rating from 1 to 5 stars.'); return redirect(url_for('profile'))
+ ref.update({'rating':rating,'rating_comment':request.form.get('comment','').strip()[:500],'rated_at':now_iso()})
+ flash('🙏 Thanks for rating the resolution!')
+ return redirect(url_for('profile'))
+@app.route('/resolved-reports')
+def resolved_reports():
+ comps=[_doc(d) for d in db.collection('complaints').where('status','==','Resolved').stream()]
+ for c in comps: c['resolved_dt']=parse_dt(c.get('resolved_at')) or parse_dt(c.get('created_at'))
+ comps.sort(key=lambda c:c['resolved_dt'] or datetime.datetime.min,reverse=True)
+ rated=[c for c in comps if c.get('rating')]
+ avg_rating=round(sum(c['rating'] for c in rated)/len(rated),1) if rated else 0
+ return render_template('resolved_reports.html',complaints=comps,total=len(comps),rated_count=len(rated),avg_rating=avg_rating)
 @app.route('/delete/<complaint_id>',methods=['POST'])
 def delete_complaint(complaint_id):
  if not session.get('admin_logged_in'): return redirect(url_for('login'))

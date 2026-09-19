@@ -4,3 +4,5 @@ Werkzeug>=3.0
 gunicorn>=21.2
 firebase-admin>=6.5
 cloudinary>=1.40
+Flask-WTF>=1.2
+Flask-Limiter>=3.5

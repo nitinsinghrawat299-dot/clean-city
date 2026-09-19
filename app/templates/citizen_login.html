@@ -8,6 +8,7 @@
     <p class="sub">{{ t('login_subtitle') }}</p>
 
     <form method="POST" action="{{ url_for('citizen_login') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="field">
         <label for="username">{{ t('username_label') }}</label>
         <div class="input-row">

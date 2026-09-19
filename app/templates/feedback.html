@@ -10,6 +10,7 @@
     </div>
 
     <form method="POST" action="{{ url_for('feedback_form') }}" class="card card-lg">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="field">
         <label id="ratingLabel">How would you rate the services?</label>
         <div class="fb-scale" role="radiogroup" aria-labelledby="ratingLabel">

@@ -78,9 +78,26 @@
       <p style="color:var(--text-main); font-size:.92rem; line-height:1.55; white-space:pre-wrap;">{{ c.description or t('no_description') }}</p>
     </div>
 
+    {% if c.status == 'Resolved' %}
+    <div class="card">
+      <h3 style="font-size:1rem; margin-bottom:12px;">{{ t('citizen_rating_header') }}</h3>
+      {% if c.resolution_photo %}
+        <img src="{{ c.resolution_photo }}" alt="Resolution photo" class="review-photo" style="margin-bottom:14px;">
+      {% endif %}
+      {% if c.rating %}
+        <span class="star-display">{% for n in range(1,6) %}<span style="color:{{ 'var(--brass)' if n <= c.rating else 'var(--border)' }};">★</span>{% endfor %}</span>
+        <span style="font-size:.85rem; color:var(--text-muted); margin-left:6px;">{{ c.rating }}/5</span>
+        {% if c.rating_comment %}<p style="margin-top:10px; font-size:.9rem; color:var(--text-main); line-height:1.5;">"{{ c.rating_comment }}"</p>{% endif %}
+      {% else %}
+        <p style="color:var(--text-faint); font-size:.85rem;">{{ t('awaiting_rating') }}</p>
+      {% endif %}
+    </div>
+    {% endif %}
+
     <div class="card">
       <h3 style="font-size:1rem; margin-bottom:14px;">{{ t('update_status') }}</h3>
-      <form method="POST" action="{{ url_for('update_status', complaint_id=c.id) }}" style="display:flex; flex-direction:column; gap:12px;">
+      <form method="POST" action="{{ url_for('update_status', complaint_id=c.id) }}" enctype="multipart/form-data" style="display:flex; flex-direction:column; gap:12px;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="cat_key" value="{{ request.args.get('from_cat','') }}">
         <select name="status" class="search-input" onchange="toggleReason(this)">
           <option value="Reported" {{ 'selected' if c.status=='Reported' }}>{{ t('status_reported') }}</option>
@@ -89,10 +106,16 @@
           <option value="Denied" {{ 'selected' if c.status=='Denied' }}>{{ t('status_denied') }}</option>
         </select>
         <input type="text" name="reason" placeholder="{{ t('reason_required_placeholder') }}" class="search-input" value="{{ c.denial_reason or '' }}" style="{{ '' if c.status == 'Denied' else 'display:none;' }}">
+        <div id="resolutionPhotoField" style="{{ '' if c.status == 'Resolved' else 'display:none;' }}">
+          <label style="font-size:.82rem; font-weight:600; display:block; margin-bottom:6px;">{{ t('resolution_photo_label') }}</label>
+          <input type="file" name="resolution_photo" accept="image/*" class="search-input">
+          <p style="font-size:.76rem; color:var(--text-faint); margin-top:4px;">{{ t('resolution_photo_hint') }}</p>
+        </div>
         <button type="submit" class="btn btn-primary btn-block">{{ t('save_status') }}</button>
       </form>
 
       <form method="POST" action="{{ url_for('delete_complaint', complaint_id=c.id) }}" onsubmit="return confirm('{{ t('delete_confirm') }}');" style="margin-top:10px;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="cat_key" value="{{ request.args.get('from_cat','') }}">
         <button type="submit" class="btn btn-ghost btn-block" style="color:var(--red-soft); border-color:rgba(217,45,45,.25);">{{ t('delete_report_btn') }}</button>
       </form>
@@ -104,9 +127,12 @@
 {% block extra_scripts %}
 <script>
   function toggleReason(select) {
-    const reasonInput = select.closest('form').querySelector('input[name="reason"]');
+    const form = select.closest('form');
+    const reasonInput = form.querySelector('input[name="reason"]');
     reasonInput.style.display = select.value === 'Denied' ? 'block' : 'none';
     reasonInput.required = select.value === 'Denied';
+    const photoField = form.querySelector('#resolutionPhotoField');
+    if (photoField) photoField.style.display = select.value === 'Resolved' ? 'block' : 'none';
   }
 </script>
 {% endblock %}

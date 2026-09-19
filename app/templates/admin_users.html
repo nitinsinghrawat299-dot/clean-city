@@ -36,6 +36,7 @@
           <td><strong>{{ u.points | default(0) }}</strong></td>
           <td>
             <form method="POST" action="{{ url_for('admin_delete_user', user_id=u.id) }}" onsubmit="return confirm('{{ t('delete_prefix') }}{{ u.username }}{{ t('delete_citizen_confirm_suffix') }}');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button type="submit" class="icon-btn danger" title="{{ t('delete_citizen') }}">🗑</button>
             </form>
           </td>

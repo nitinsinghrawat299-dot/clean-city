@@ -36,6 +36,7 @@
       <!-- REPORT FORM -->
       <div class="card card-lg">
         <form method="POST" action="{{ url_for('submit') }}" enctype="multipart/form-data" id="reportForm">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
           <!-- STEP 1: SNAP -->
           <div class="field">

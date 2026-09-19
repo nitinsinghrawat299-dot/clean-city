@@ -17,6 +17,7 @@
     </div>
 
     <form method="POST" action="{{ url_for('survey') }}" id="surveyForm" novalidate>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="sv-list">
         {% for q in questions %}
           {% set chosen = answers.get(q.id) %}

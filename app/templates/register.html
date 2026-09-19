@@ -8,6 +8,7 @@
     <p class="sub">{{ t('signup_subtitle') }}</p>
 
     <form method="POST" action="{{ url_for('register') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="field">
         <label for="username">{{ t('username_label') }}</label>
         <input type="text" id="username" name="username" required minlength="3" autofocus placeholder="{{ t('username_label') }}">

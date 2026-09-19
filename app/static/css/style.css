@@ -582,3 +582,18 @@ img{width:100%;height:auto;object-fit:cover;}
 @media (max-width:640px){
   .gov-ribbon .wrap{justify-content:center; text-align:center;}
 }
+/* =========================================================
+   Resolution proof photos + citizen star ratings
+   ========================================================= */
+.resolution-photo-sm{width:120px; height:90px; object-fit:cover; border-radius:var(--radius-sm); display:block; margin-bottom:8px;}
+.star-display{letter-spacing:2px; font-size:1.05rem;}
+.star-input{display:inline-flex; flex-direction:row-reverse; gap:2px;}
+.star-input input{position:absolute; opacity:0; width:1px; height:1px; pointer-events:none;}
+.star-input label{font-size:1.7rem; line-height:1; color:var(--border-strong); cursor:pointer; transition:color .15s var(--ease);}
+.star-input label:hover,
+.star-input label:hover ~ label,
+.star-input input:checked ~ label{color:var(--brass);}
+.star-input input:focus-visible + label{outline:2px solid var(--pine); outline-offset:2px; border-radius:2px;}
+.resolved-card{padding:0; overflow:hidden; display:flex; flex-direction:column;}
+.resolved-card-photo{width:100%; height:170px; object-fit:cover; display:block; background:var(--paper-alt);}
+.resolved-card-body{padding:18px;}
