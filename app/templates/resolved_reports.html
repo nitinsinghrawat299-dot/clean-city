@@ -19,22 +19,42 @@
       <div class="cat-grid">
         {% for c in complaints %}
           <div class="card resolved-card">
-            {% if c.resolution_photo %}
-              <img src="{{ c.resolution_photo }}" alt="{{ t('resolved_reports_title') }}" class="resolved-card-photo">
-            {% elif c.image and c.media_type != 'video' %}
-              <img src="{{ c.image }}" alt="{{ t('resolved_reports_title') }}" class="resolved-card-photo">
-            {% endif %}
+            <div class="resolved-photos">
+              <div class="resolved-photo-slot">
+                <span class="resolved-photo-tag resolved-photo-tag--before">{{ t('resolved_photo_reported') }}</span>
+                {% if c.image and c.media_type != 'video' %}
+                  <img src="{{ c.image }}" alt="{{ t('resolved_photo_reported') }}">
+                {% elif c.image and c.media_type == 'video' %}
+                  <video src="{{ c.image }}" muted></video>
+                {% else %}
+                  <div class="resolved-photo-empty">{{ t('no_photo') }}</div>
+                {% endif %}
+              </div>
+              <div class="resolved-photo-slot">
+                <span class="resolved-photo-tag resolved-photo-tag--after">{{ t('resolved_photo_resolved') }}</span>
+                {% if c.resolution_photo %}
+                  <img src="{{ c.resolution_photo }}" alt="{{ t('resolved_photo_resolved') }}">
+                {% else %}
+                  <div class="resolved-photo-empty">{{ t('no_photo') }}</div>
+                {% endif %}
+              </div>
+            </div>
             <div class="resolved-card-body">
               {% if c.category %}<div style="font-size:.76rem; color:var(--text-muted); margin-bottom:4px;">{{ category_label(c.category, c.subcategory) }}</div>{% endif %}
               <h4 style="font-size:.95rem; margin-bottom:4px;">{{ (c.description or '')[:70] }}{{ '…' if c.description and c.description|length > 70 }}</h4>
               <p style="font-size:.8rem; color:var(--text-muted); margin-bottom:10px;">📍 {{ c.location or c.address or '—' }}</p>
-              {% if c.rating %}
-                <span class="star-display">{% for n in range(1,6) %}<span style="color:{{ 'var(--brass)' if n <= c.rating else 'var(--border)' }};">★</span>{% endfor %}</span>
-                {% if c.rating_comment %}<p style="font-size:.82rem; color:var(--text-main); margin-top:8px; font-style:italic; line-height:1.45;">"{{ c.rating_comment }}"</p>{% endif %}
-                <p style="font-size:.74rem; color:var(--text-faint); margin-top:8px;">— {{ c.citizen_username or 'Citizen' }}</p>
-              {% else %}
-                <p style="font-size:.8rem; color:var(--text-faint);">{{ t('awaiting_rating') }}</p>
+              {% if c.resolution_note %}
+                <p style="font-size:.82rem; color:var(--text-main); margin-bottom:10px;"><strong>{{ t('resolution_note_label') }}:</strong> {{ c.resolution_note }}</p>
               {% endif %}
+              <div class="resolved-feedback">
+                {% if c.rating %}
+                  <span class="star-display">{% for n in range(1,6) %}<span style="color:{{ 'var(--brass)' if n <= c.rating else 'var(--border)' }};">★</span>{% endfor %}</span>
+                  {% if c.rating_comment %}<p style="font-size:.82rem; color:var(--text-main); margin-top:8px; font-style:italic; line-height:1.45;">"{{ c.rating_comment }}"</p>{% endif %}
+                  <p style="font-size:.74rem; color:var(--text-faint); margin-top:8px;">— {{ c.citizen_username or 'Citizen' }}</p>
+                {% else %}
+                  <p style="font-size:.8rem; color:var(--text-faint);">{{ t('awaiting_rating') }}</p>
+                {% endif %}
+              </div>
             </div>
           </div>
         {% endfor %}

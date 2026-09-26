@@ -243,6 +243,12 @@ var I18N={
   mediaInput.addEventListener('change', function(){
     var f=this.files[0];
     if(!f) return;
+    var MAX_MEDIA_BYTES=15*1024*1024; // keep in sync with UPLOAD_LIMITS_MB['submit'] in app.py
+    if(f.size>MAX_MEDIA_BYTES){
+      alert('That file is larger than 15MB — please choose a smaller photo or a shorter video.');
+      mediaInput.value='';
+      return;
+    }
     if(f.type.indexOf('video')===0){
       rawPhotoFile=null; stampedBlob=null;
       rawVideoFile=f;

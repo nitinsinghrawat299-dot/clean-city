@@ -82,7 +82,13 @@
     <div class="card">
       <h3 style="font-size:1rem; margin-bottom:12px;">{{ t('citizen_rating_header') }}</h3>
       {% if c.resolution_photo %}
-        <img src="{{ c.resolution_photo }}" alt="Resolution photo" class="review-photo" style="margin-bottom:14px;">
+        <img src="{{ c.resolution_photo }}" alt="Resolution photo" class="review-photo" style="margin-bottom:6px;">
+        {% if c.resolution_coordinates %}
+          <p style="font-size:.74rem; color:var(--text-faint); margin-bottom:14px;">📍 Geotagged at {{ c.resolution_coordinates }}</p>
+        {% endif %}
+      {% endif %}
+      {% if c.resolution_note %}
+        <p style="font-size:.88rem; color:var(--text-main); line-height:1.5; margin-bottom:14px;"><strong>{{ t('resolution_note_label') }}:</strong> {{ c.resolution_note }}</p>
       {% endif %}
       {% if c.rating %}
         <span class="star-display">{% for n in range(1,6) %}<span style="color:{{ 'var(--brass)' if n <= c.rating else 'var(--border)' }};">★</span>{% endfor %}</span>
@@ -106,10 +112,21 @@
           <option value="Denied" {{ 'selected' if c.status=='Denied' }}>{{ t('status_denied') }}</option>
         </select>
         <input type="text" name="reason" placeholder="{{ t('reason_required_placeholder') }}" class="search-input" value="{{ c.denial_reason or '' }}" style="{{ '' if c.status == 'Denied' else 'display:none;' }}">
+        {% set requires_photo = subcategory.get('requires_photo', True) if subcategory else True %}
+        <input type="hidden" name="resolution_coordinates" id="resolutionCoordinates" value="">
         <div id="resolutionPhotoField" style="{{ '' if c.status == 'Resolved' else 'display:none;' }}">
-          <label style="font-size:.82rem; font-weight:600; display:block; margin-bottom:6px;">{{ t('resolution_photo_label') }}</label>
-          <input type="file" name="resolution_photo" accept="image/*" class="search-input">
-          <p style="font-size:.76rem; color:var(--text-faint); margin-top:4px;">{{ t('resolution_photo_hint') }}</p>
+          {% if not requires_photo %}
+            <label style="font-size:.82rem; font-weight:600; display:block; margin-bottom:6px;">{{ t('resolution_note_label') }}</label>
+            <textarea name="resolution_note" class="search-input" maxlength="500" rows="3" placeholder="{{ t('resolution_note_placeholder') }}">{{ c.resolution_note or '' }}</textarea>
+            <p style="font-size:.76rem; color:var(--text-faint); margin-top:4px; margin-bottom:12px;">{{ t('resolution_note_hint') }}</p>
+            <label style="font-size:.82rem; font-weight:600; display:block; margin-bottom:6px;">{{ t('resolution_photo_optional_label') }}</label>
+            <input type="file" name="resolution_photo" id="resolutionPhotoInput" accept="image/*" class="search-input">
+          {% else %}
+            <label style="font-size:.82rem; font-weight:600; display:block; margin-bottom:6px;">{{ t('resolution_photo_label') }}</label>
+            <input type="file" name="resolution_photo" id="resolutionPhotoInput" accept="image/*" class="search-input">
+            <p style="font-size:.76rem; color:var(--text-faint); margin-top:4px;">{{ t('resolution_photo_hint') }}</p>
+          {% endif %}
+          <p style="font-size:.72rem; color:var(--text-faint); margin-top:6px;" id="geotagStatus"></p>
         </div>
         <button type="submit" class="btn btn-primary btn-block">{{ t('save_status') }}</button>
       </form>
@@ -134,5 +151,41 @@
     const photoField = form.querySelector('#resolutionPhotoField');
     if (photoField) photoField.style.display = select.value === 'Resolved' ? 'block' : 'none';
   }
+
+  // ---- Resolution photo: geotag + client-side size guard ----
+  (function () {
+    var input = document.getElementById('resolutionPhotoInput');
+    var coordsField = document.getElementById('resolutionCoordinates');
+    var statusEl = document.getElementById('geotagStatus');
+    if (!input) return;
+    var MAX_BYTES = 6 * 1024 * 1024; // keep in sync with UPLOAD_LIMITS_MB['update_status'] in app.py
+
+    input.addEventListener('change', function () {
+      var f = this.files[0];
+      coordsField.value = '';
+      if (statusEl) statusEl.textContent = '';
+      if (!f) return;
+
+      if (f.size > MAX_BYTES) {
+        alert('That photo is larger than 6MB — please choose a smaller one.');
+        input.value = '';
+        return;
+      }
+
+      // Best-effort geotag: tags where the admin's device is right now, so the
+      // resolution photo carries proof of an on-site visit. Never blocks saving —
+      // if location isn't available/allowed, the photo still uploads as usual.
+      if (navigator.geolocation) {
+        if (statusEl) statusEl.textContent = 'Getting device location for the geotag…';
+        navigator.geolocation.getCurrentPosition(function (pos) {
+          var lat = pos.coords.latitude.toFixed(6), lng = pos.coords.longitude.toFixed(6);
+          coordsField.value = lat + ',' + lng;
+          if (statusEl) statusEl.textContent = '📍 Geotagged at ' + lat + ', ' + lng;
+        }, function () {
+          if (statusEl) statusEl.textContent = 'Location unavailable — photo will upload without a geotag.';
+        }, { enableHighAccuracy: true, timeout: 8000 });
+      }
+    });
+  })();
 </script>
 {% endblock %}

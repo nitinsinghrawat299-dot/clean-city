@@ -21,6 +21,21 @@ ALLOWED={'png','jpg','jpeg','gif','webp'}
 ALLOWED_VIDEO={'mp4','mov','webm','mkv','3gp'}
 ADMIN_USERNAME=os.getenv('ADMIN_USERNAME','admin'); ADMIN_PASSWORD_HASH=os.getenv('ADMIN_PASSWORD_HASH','')
 
+# ---- Upload size limits ----
+# Hard ceiling enforced by Flask/Werkzeug at the WSGI level (aborts with 413 before
+# the whole body is even read into memory) — this is the real backstop against abuse.
+app.config['MAX_CONTENT_LENGTH']=20*1024*1024  # 20MB absolute max per request
+# Friendlier, endpoint-specific soft limits on top of that (checked in enforce_upload_limits below).
+UPLOAD_LIMITS_MB={
+ 'submit':15,          # citizen report: one photo, or photo+video+voice note for the citizen-complaint category
+ 'update_status':6,    # admin resolution photo
+}
+
+@app.errorhandler(413)
+def too_large(e):
+ flash('That upload is too large. Please use a smaller photo or video and try again.')
+ return redirect(request.referrer or url_for('home')), 413
+
 # ---- CSRF protection (every POST form must include {{ csrf_token() }}) ----
 csrf=CSRFProtect(app)
 
@@ -34,6 +49,15 @@ limiter=Limiter(get_remote_address, app=app, default_limits=[])
 def ratelimit_handler(e):
  flash('Too many attempts — please wait a minute and try again.')
  return redirect(request.referrer or url_for('home')), 429
+
+@app.before_request
+def enforce_upload_limits():
+ # Content-Length is client-reported, so this is a fast, friendly early rejection —
+ # MAX_CONTENT_LENGTH above is the real, unspoofable ceiling.
+ limit_mb=UPLOAD_LIMITS_MB.get(request.endpoint)
+ if limit_mb and request.content_length and request.content_length>limit_mb*1024*1024:
+  flash(f'That file is too large — please keep uploads under {limit_mb}MB.')
+  return redirect(request.referrer or url_for('home'))
 
 # ---- Language / translation ----
 def get_lang(): return session.get('lang','en')
@@ -265,9 +289,16 @@ def report_subcategory(cat_key,sub_key):
  if sub.get('media_type')=='photo_video_voice': return render_template('report_form_media.html',cat_key=cat_key,sub_key=sub_key,category=cat,subcategory=sub)
  return render_template('report_form.html',cat_key=cat_key,sub_key=sub_key,category=cat,subcategory=sub)
 @app.route('/register',methods=['GET','POST'])
+@limiter.limit('6 per hour;15 per day',methods=['POST'])
 def register():
  if citizen_is_logged_in(): return redirect(url_for('home'))
  if request.method=='POST':
+  # Honeypot: a hidden field real visitors never see or fill in, but simple bots
+  # that auto-fill every form field on the page will. Pretend success so the bot
+  # doesn't learn to look for and skip the field next time — no account is created.
+  if request.form.get('website'):
+   session['prefill_username']=''; session['prefill_password']=''
+   flash('Account created!'); return redirect(url_for('citizen_login'))
   u=request.form.get('username','').strip(); e=request.form.get('email','').strip().lower(); p=request.form.get('password',''); cp=request.form.get('confirm_password','')
   if len(u)<3 or u.lower() in {'admin','administrator','cleancity'}: flash('Please choose a valid username.'); return redirect(url_for('register'))
   if not e or '@' not in e or p!=cp or len(p)<4: flash('Please check your email and passwords.'); return redirect(url_for('register'))
@@ -440,7 +471,8 @@ def admin_report_detail(complaint_id):
  citizen=_doc(db.collection('users').document(c['citizen_id']).get()) if c.get('citizen_id') else None
  from_cat=request.args.get('from_cat','')
  back_url=url_for('admin_reports',cat_key=from_cat) if from_cat else url_for('admin')
- return render_template('admin_report_detail.html',c=c,citizen=citizen,back_url=back_url)
+ subcategory=(CATEGORIES.get(c.get('category'),{}).get('subcats',{}) or {}).get(c.get('subcategory'))
+ return render_template('admin_report_detail.html',c=c,citizen=citizen,back_url=back_url,subcategory=subcategory)
 @app.route('/admin/users')
 def admin_users():
  if not session.get('admin_logged_in'): return redirect(url_for('login'))
@@ -518,11 +550,24 @@ def update_status(complaint_id):
  s=request.form.get('status','Reported'); r=request.form.get('reason','').strip(); cat_key=request.form.get('cat_key','')
  ref=db.collection('complaints').document(complaint_id); c=_doc(ref.get())
  if c and s=='Resolved' and c.get('status')!='Resolved':
+  sub=(CATEGORIES.get(c.get('category'),{}).get('subcats',{}) or {}).get(c.get('subcategory'),{})
+  # Some subcategories (e.g. "Garbage Vehicle Not Arrived") can't be usefully photographed
+  # by the citizen either — mirror that here: a written note is enough, photo stays optional.
+  photo_required=sub.get('requires_photo',True)
   photo=request.files.get('resolution_photo')
-  if not (photo and photo.filename and allowed(photo.filename)):
-   flash('Please attach a photo showing the issue has been resolved before marking this report Resolved.')
-   return redirect(url_for('admin_report_detail',complaint_id=complaint_id,from_cat=cat_key))
-  update_data={'status':'Resolved','resolution_photo':save_image(photo),'resolved_at':now_iso()}
+  note=request.form.get('resolution_note','').strip()
+  if photo_required:
+   if not (photo and photo.filename and allowed(photo.filename)):
+    flash('Please attach a photo showing the issue has been resolved before marking this report Resolved.')
+    return redirect(url_for('admin_report_detail',complaint_id=complaint_id,from_cat=cat_key))
+  else:
+   if not note:
+    flash('Please add a short note describing how this was resolved before marking this report Resolved.')
+    return redirect(url_for('admin_report_detail',complaint_id=complaint_id,from_cat=cat_key))
+  update_data={'status':'Resolved','resolved_at':now_iso(),'resolution_note':note}
+  if photo and photo.filename and allowed(photo.filename):
+   update_data['resolution_photo']=save_image(photo)
+   update_data['resolution_coordinates']=request.form.get('resolution_coordinates','').strip()
   if not c.get('points_awarded'):
    db.collection('users').document(c['citizen_id']).update({'points':firestore.Increment(10)})
    update_data['points_awarded']=10

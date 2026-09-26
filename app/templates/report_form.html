@@ -221,6 +221,12 @@ var I18N={
   imageInput && imageInput.addEventListener('change', function(){
     var f=this.files[0];
     if(!f) return;
+    var MAX_PHOTO_BYTES=15*1024*1024; // keep in sync with UPLOAD_LIMITS_MB['submit'] in app.py
+    if(f.size>MAX_PHOTO_BYTES){
+      alert('That photo is larger than 15MB — please choose a smaller one.');
+      imageInput.value='';
+      return;
+    }
     rawPhotoFile=f;
     applyStamp(f);
     // Tag GPS onto the photo automatically the moment it's taken —
