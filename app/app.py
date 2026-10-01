@@ -1,14 +1,24 @@
-import os, uuid, json, datetime
+import os, uuid, json, datetime, io, re, urllib.request
 import firebase_admin
 from firebase_admin import credentials, firestore
 import cloudinary, cloudinary.uploader
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
 from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
 from flask_wtf import CSRFProtect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from translations import TRANSLATIONS
+from PIL import Image as PILImage
+from xml.sax.saxutils import escape as _xml_escape
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import mm
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
+                                 Image as RLImage, PageBreak, HRFlowable)
 
 load_dotenv(); BASE=os.path.dirname(os.path.abspath(__file__))
 app=Flask(__name__); app.secret_key=os.getenv('SECRET_KEY','clean-city-local-secret-change-me')
@@ -159,6 +169,141 @@ def category_label(cat_key,sub_key):
  sub=cat['subcats'].get(sub_key)
  if not sub: return cat['icon']+' '+t('cat_'+cat_key)
  return cat['icon']+' '+t('sub_'+sub_key)
+
+# ---- PDF data export ----
+# Tries to find a Devanagari-capable font already installed on the server so Hindi
+# text renders properly; if none is found, Hindi runs are swapped for a plain-English
+# placeholder instead of printing garbled boxes (base PDF fonts can't show those glyphs).
+PDF_FONT_REGULAR='Helvetica'; PDF_FONT_BOLD='Helvetica-Bold'; _PDF_HAS_DEVANAGARI=False
+for _p in (
+ '/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf',
+ '/usr/share/fonts/opentype/noto/NotoSansDevanagari-Regular.ttf',
+ '/usr/share/fonts/truetype/lohit-devanagari/Lohit-Devanagari.ttf',
+ os.path.join(BASE,'static','fonts','NotoSansDevanagari-Regular.ttf'),
+):
+ if os.path.isfile(_p):
+  try:
+   pdfmetrics.registerFont(TTFont('PDFDevanagari',_p))
+   PDF_FONT_REGULAR=PDF_FONT_BOLD='PDFDevanagari'; _PDF_HAS_DEVANAGARI=True; break
+  except Exception: pass
+_DEVANAGARI_RE=re.compile('[\u0900-\u097F]')
+def _pdf_text(s):
+ s=str(s or '')
+ if _PDF_HAS_DEVANAGARI or not _DEVANAGARI_RE.search(s): return s
+ stripped=_DEVANAGARI_RE.sub('',s).strip(' -:,.')
+ return stripped if stripped else '[Hindi text - view on the live site]'
+def _pdf_esc(s): return _xml_escape(_pdf_text(s))
+def _fetch_image_bytes(url):
+ if not url: return None
+ try:
+  req=urllib.request.Request(url, headers={'User-Agent':'Mozilla/5.0'})
+  with urllib.request.urlopen(req, timeout=8) as resp: return resp.read()
+ except Exception: return None
+def _pdf_image_flowable(raw_bytes, max_w_mm=80, max_h_mm=60):
+ try:
+  img=PILImage.open(io.BytesIO(raw_bytes)).convert('RGB')
+  buf=io.BytesIO(); img.save(buf, format='JPEG', quality=75); buf.seek(0)
+  w,h=img.size; scale=min(max_w_mm*mm/w, max_h_mm*mm/h)
+  return RLImage(buf, width=w*scale, height=h*scale)
+ except Exception: return None
+
+def generate_data_export_pdf(users, comps, image_cap=250):
+ buf=io.BytesIO()
+ doc=SimpleDocTemplate(buf, pagesize=A4, topMargin=16*mm, bottomMargin=16*mm, leftMargin=16*mm, rightMargin=16*mm)
+ styles=getSampleStyleSheet()
+ h1=ParagraphStyle('h1x',parent=styles['Heading1'],fontName=PDF_FONT_BOLD,fontSize=16)
+ h2=ParagraphStyle('h2x',parent=styles['Heading2'],fontName=PDF_FONT_BOLD,fontSize=12,spaceBefore=10)
+ normal=ParagraphStyle('normalx',parent=styles['Normal'],fontName=PDF_FONT_REGULAR,fontSize=9,leading=12)
+ small=ParagraphStyle('smallx',parent=styles['Normal'],fontName=PDF_FONT_REGULAR,fontSize=8,textColor=colors.grey,leading=10)
+ cell=ParagraphStyle('cellx',parent=normal,fontSize=8,leading=10)
+
+ story=[Paragraph('Clean City (SPR) &mdash; Full Data Export',h1),
+        Paragraph('Pauri Nagar Palika Parishad &mdash; Government of Uttarakhand',normal),
+        Paragraph('Generated '+now_iso()[:16].replace('T',' ')+' UTC',small), Spacer(1,10)]
+
+ resolved=[c for c in comps if c.get('status')=='Resolved']
+ denied=[c for c in comps if c.get('status')=='Denied']
+ pending=len(comps)-len(resolved)-len(denied)
+ rated=[c for c in resolved if c.get('rating')]
+ avg_rating=round(sum(c['rating'] for c in rated)/len(rated),1) if rated else 0
+
+ story.append(Paragraph('Summary',h2))
+ rows=[['Total reports',str(len(comps))],['Resolved',str(len(resolved))],
+       ['Pending / In Progress',str(pending)],['Denied',str(len(denied))],
+       ['Registered citizens',str(len(users))],
+       ['Total points awarded',str(sum(u.get('points',0) for u in users))],
+       ['Average citizen rating', f'{avg_rating}/5' if rated else '\u2014']]
+ t1=Table(rows,colWidths=[70*mm,40*mm])
+ t1.setStyle(TableStyle([('FONTNAME',(0,0),(-1,-1),PDF_FONT_REGULAR),('FONTSIZE',(0,0),(-1,-1),9),
+  ('BOTTOMPADDING',(0,0),(-1,-1),4),('TOPPADDING',(0,0),(-1,-1),4),
+  ('LINEBELOW',(0,0),(-1,-2),0.4,colors.HexColor('#e2e2e2')),('FONTNAME',(0,0),(0,-1),PDF_FONT_BOLD)]))
+ story+=[t1,Spacer(1,14),Paragraph(f'Registered Citizens ({len(users)})',h2)]
+
+ if users:
+  urows=[['Username','Email','Points','Joined']]
+  for u in sorted(users,key=lambda x:(x.get('username') or '').lower()):
+   urows.append([Paragraph(_pdf_esc(u.get('username','\u2014')),cell),Paragraph(_pdf_esc(u.get('email','\u2014')),cell),
+                 str(u.get('points',0)),Paragraph(_pdf_esc((u.get('created_at') or '')[:10] or '\u2014'),cell)])
+  ut=Table(urows,colWidths=[38*mm,62*mm,20*mm,30*mm],repeatRows=1)
+  ut.setStyle(TableStyle([('FONTNAME',(0,0),(-1,0),PDF_FONT_BOLD),('FONTNAME',(0,1),(-1,-1),PDF_FONT_REGULAR),
+   ('FONTSIZE',(0,0),(-1,-1),8),('BACKGROUND',(0,0),(-1,0),colors.HexColor('#eef6ef')),
+   ('GRID',(0,0),(-1,-1),0.3,colors.HexColor('#dddddd')),('TOPPADDING',(0,0),(-1,-1),3),('BOTTOMPADDING',(0,0),(-1,-1),3)]))
+  story.append(ut)
+ else:
+  story.append(Paragraph('No registered citizens yet.',normal))
+ story.append(PageBreak())
+
+ story.append(Paragraph(f'Reports ({len(comps)})',h2))
+ if len(comps)>image_cap:
+  story.append(Paragraph(f'(Photos are embedded for the {image_cap} most recent reports only, to keep this export a reasonable size. Older reports still list all their text details below.)',small))
+ story.append(Spacer(1,4))
+ embedded=0
+ for c in sorted(comps,key=lambda x:x.get('report_number') or 0,reverse=True):
+  block=[]
+  title=f"#{c.get('report_number','\u2014')} \u2014 {category_label(c.get('category',''),c.get('subcategory',''))} \u2014 {c.get('status','\u2014')}"
+  block.append(Paragraph(_pdf_esc(title),ParagraphStyle('tt',parent=normal,fontName=PDF_FONT_BOLD,fontSize=10)))
+  block.append(Paragraph(f"By {_pdf_esc(c.get('citizen_username','\u2014'))} &middot; Reported {_pdf_esc((c.get('created_at') or '\u2014')[:16].replace('T',' '))}",small))
+  if c.get('description'): block.append(Paragraph('<b>Description:</b> '+_pdf_esc(c['description']),normal))
+  loc=c.get('address') or c.get('location') or c.get('coordinates') or '\u2014'
+  block.append(Paragraph('<b>Location:</b> '+_pdf_esc(loc),normal))
+  if c.get('status')=='Denied' and c.get('denial_reason'):
+   block.append(Paragraph('<b>Denial reason:</b> '+_pdf_esc(c['denial_reason']),normal))
+  if c.get('resolution_note'): block.append(Paragraph('<b>Resolution note:</b> '+_pdf_esc(c['resolution_note']),normal))
+  if c.get('rating'):
+   cmt=f' \u2014 "{_pdf_esc(c["rating_comment"])}"' if c.get('rating_comment') else ''
+   block.append(Paragraph(f"<b>Citizen rating:</b> {c['rating']}/5{cmt}",normal))
+
+  img_cells=[]
+  can_embed=embedded<image_cap
+  if c.get('media_type')=='video' and c.get('image'):
+   safe_url=_xml_escape(c['image'])
+   block.append(Paragraph(f'<b>Video attachment (not embeddable in PDF):</b> <link href="{safe_url}">{safe_url}</link>',normal))
+  elif c.get('image') and can_embed:
+   raw=_fetch_image_bytes(c['image'])
+   fl=_pdf_image_flowable(raw) if raw else None
+   if fl: img_cells.append([Paragraph('Reported photo',small),fl]); embedded+=1
+  if c.get('audio'):
+   safe_url=_xml_escape(c['audio'])
+   block.append(Paragraph(f'<b>Voice note:</b> <link href="{safe_url}">{safe_url}</link>',normal))
+  if c.get('resolution_photo') and can_embed:
+   raw=_fetch_image_bytes(c['resolution_photo'])
+   fl=_pdf_image_flowable(raw) if raw else None
+   if fl: img_cells.append([Paragraph('Resolution photo',small),fl]); embedded+=1
+
+  if img_cells:
+   if len(img_cells)==2:
+    tbl=Table([[img_cells[0][0],img_cells[1][0]],[img_cells[0][1],img_cells[1][1]]],colWidths=[85*mm,85*mm])
+   else:
+    tbl=Table([[img_cells[0][0]],[img_cells[0][1]]],colWidths=[85*mm])
+   tbl.setStyle(TableStyle([('VALIGN',(0,0),(-1,-1),'TOP')]))
+   block+=[Spacer(1,4),tbl]
+
+  block+=[Spacer(1,4),HRFlowable(width='100%',thickness=0.4,color=colors.HexColor('#dddddd')),Spacer(1,8)]
+  story.extend(block)
+
+ doc.build(story)
+ buf.seek(0)
+ return buf
 
 # ---- Citizen Cleanliness Survey ----
 SURVEY_QUESTIONS=[
@@ -544,6 +689,43 @@ def admin_map():
  denied=sum(1 for p in pins if p['status']=='Denied')
  pending=len(pins)-resolved-denied
  return render_template('admin_map.html',pins=pins,rng=rng,total=len(pins),resolved=resolved,pending=pending,denied=denied)
+@app.route('/admin/export-pdf')
+def admin_export_pdf():
+ if not session.get('admin_logged_in'): return redirect(url_for('login'))
+ users=[_doc(d) for d in db.collection('users').stream()]
+ comps=[_doc(d) for d in db.collection('complaints').stream()]
+ pdf_buf=generate_data_export_pdf(users,comps)
+ filename='clean-city-export-'+datetime.datetime.utcnow().strftime('%Y%m%d-%H%M')+'.pdf'
+ return send_file(pdf_buf,mimetype='application/pdf',as_attachment=True,download_name=filename)
+
+def _delete_collection(coll_ref,batch_size=400):
+ docs=list(coll_ref.limit(batch_size).stream())
+ deleted=0
+ while docs:
+  batch=db.batch()
+  for d in docs: batch.delete(d.reference)
+  batch.commit(); deleted+=len(docs)
+  docs=list(coll_ref.limit(batch_size).stream())
+ return deleted
+
+@app.route('/admin/reset-database',methods=['GET','POST'])
+@limiter.limit('5 per hour',methods=['POST'])
+def admin_reset_database():
+ if not session.get('admin_logged_in'): return redirect(url_for('login'))
+ if request.method=='POST':
+  pw=request.form.get('password','')
+  confirm=request.form.get('confirm_text','').strip()
+  if confirm!='RESET':
+   flash('Please type RESET exactly to confirm.'); return redirect(url_for('admin_reset_database'))
+  if not ADMIN_PASSWORD_HASH or not check_password_hash(ADMIN_PASSWORD_HASH,pw):
+   flash('Incorrect password — database was not touched.'); return redirect(url_for('admin_reset_database'))
+  for name in ('complaints','users','surveys','feedback','visits'):
+   _delete_collection(db.collection(name))
+  session.clear(); session['admin_logged_in']=True  # keep the admin signed in; every citizen session is now invalid
+  flash('✅ Database has been reset. All reports, citizen accounts, survey responses and feedback were deleted.')
+  return redirect(url_for('admin'))
+ return render_template('admin_reset_confirm.html')
+
 @app.route('/update/<complaint_id>',methods=['POST'])
 def update_status(complaint_id):
  if not session.get('admin_logged_in'): return redirect(url_for('login'))
