@@ -1,4 +1,5 @@
 import os, uuid, json, datetime, io, re, urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import firebase_admin
 from firebase_admin import credentials, firestore
 import cloudinary, cloudinary.uploader
@@ -197,8 +198,24 @@ def _fetch_image_bytes(url):
  if not url: return None
  try:
   req=urllib.request.Request(url, headers={'User-Agent':'Mozilla/5.0'})
-  with urllib.request.urlopen(req, timeout=8) as resp: return resp.read()
+  with urllib.request.urlopen(req, timeout=5) as resp: return resp.read()
  except Exception: return None
+def _fetch_images_concurrently(urls, max_workers=12):
+ # Network fetches are the slow part of building this PDF (gunicorn's default
+ # request timeout is 30s, and this export can be killed mid-request on Render's
+ # free tier if 100+ images are fetched one at a time). Fetching them in parallel
+ # on a thread pool cuts wall-clock time roughly max_workers-fold, since each
+ # fetch is pure I/O wait, not CPU work.
+ out={}
+ urls=[u for u in dict.fromkeys(urls) if u]  # de-dupe, preserve order, drop falsy
+ if not urls: return out
+ with ThreadPoolExecutor(max_workers=min(max_workers,len(urls))) as ex:
+  futures={ex.submit(_fetch_image_bytes,u):u for u in urls}
+  for fut in as_completed(futures):
+   u=futures[fut]
+   try: out[u]=fut.result()
+   except Exception: out[u]=None
+ return out
 def _pdf_image_flowable(raw_bytes, max_w_mm=80, max_h_mm=60):
  try:
   img=PILImage.open(io.BytesIO(raw_bytes)).convert('RGB')
@@ -207,7 +224,7 @@ def _pdf_image_flowable(raw_bytes, max_w_mm=80, max_h_mm=60):
   return RLImage(buf, width=w*scale, height=h*scale)
  except Exception: return None
 
-def generate_data_export_pdf(users, comps, image_cap=250):
+def generate_data_export_pdf(users, comps, image_cap=60):
  buf=io.BytesIO()
  doc=SimpleDocTemplate(buf, pagesize=A4, topMargin=16*mm, bottomMargin=16*mm, leftMargin=16*mm, rightMargin=16*mm)
  styles=getSampleStyleSheet()
@@ -255,10 +272,28 @@ def generate_data_export_pdf(users, comps, image_cap=250):
 
  story.append(Paragraph(f'Reports ({len(comps)})',h2))
  if len(comps)>image_cap:
-  story.append(Paragraph(f'(Photos are embedded for the {image_cap} most recent reports only, to keep this export a reasonable size. Older reports still list all their text details below.)',small))
+  story.append(Paragraph(f'(Photos are embedded for the {image_cap} most recent reports only, to keep this export fast and a reasonable size. Older reports still list all their text details below.)',small))
  story.append(Spacer(1,4))
+
+ comps_sorted=sorted(comps,key=lambda x:x.get('report_number') or 0,reverse=True)
+
+ # ---- Phase 1: decide which photos to embed, then fetch them ALL concurrently ----
+ # (not one-by-one as the PDF is built) so this request finishes well inside
+ # gunicorn's request timeout even with dozens of reports.
+ to_fetch=[]
+ budget=image_cap
+ for c in comps_sorted:
+  if budget<=0: break
+  if c.get('image') and c.get('media_type')!='video':
+   to_fetch.append(c['image']); budget-=1
+  if budget<=0: break
+  if c.get('resolution_photo'):
+   to_fetch.append(c['resolution_photo']); budget-=1
+ image_bytes=_fetch_images_concurrently(to_fetch)
+
+ # ---- Phase 2: build the PDF from the already-fetched bytes (no network calls here) ----
  embedded=0
- for c in sorted(comps,key=lambda x:x.get('report_number') or 0,reverse=True):
+ for c in comps_sorted:
   block=[]
   title=f"#{c.get('report_number','\u2014')} \u2014 {category_label(c.get('category',''),c.get('subcategory',''))} \u2014 {c.get('status','\u2014')}"
   block.append(Paragraph(_pdf_esc(title),ParagraphStyle('tt',parent=normal,fontName=PDF_FONT_BOLD,fontSize=10)))
@@ -274,19 +309,18 @@ def generate_data_export_pdf(users, comps, image_cap=250):
    block.append(Paragraph(f"<b>Citizen rating:</b> {c['rating']}/5{cmt}",normal))
 
   img_cells=[]
-  can_embed=embedded<image_cap
   if c.get('media_type')=='video' and c.get('image'):
    safe_url=_xml_escape(c['image'])
    block.append(Paragraph(f'<b>Video attachment (not embeddable in PDF):</b> <link href="{safe_url}">{safe_url}</link>',normal))
-  elif c.get('image') and can_embed:
-   raw=_fetch_image_bytes(c['image'])
+  elif c.get('image') and c['image'] in image_bytes:
+   raw=image_bytes.get(c['image'])
    fl=_pdf_image_flowable(raw) if raw else None
    if fl: img_cells.append([Paragraph('Reported photo',small),fl]); embedded+=1
   if c.get('audio'):
    safe_url=_xml_escape(c['audio'])
    block.append(Paragraph(f'<b>Voice note:</b> <link href="{safe_url}">{safe_url}</link>',normal))
-  if c.get('resolution_photo') and can_embed:
-   raw=_fetch_image_bytes(c['resolution_photo'])
+  if c.get('resolution_photo') and c['resolution_photo'] in image_bytes:
+   raw=image_bytes.get(c['resolution_photo'])
    fl=_pdf_image_flowable(raw) if raw else None
    if fl: img_cells.append([Paragraph('Resolution photo',small),fl]); embedded+=1
 
