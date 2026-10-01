@@ -7,6 +7,11 @@
     <div class="dash-header">
       <h1>🏆 {{ t('leaderboard_title') }}</h1>
       <p>{{ t('leaderboard_lede') }}</p>
+      <p><strong>{{ month_label }}</strong> · {{ t('lb_resets_monthly') }}</p>
+      <p>
+        <a href="{{ url_for('leaderboard', month=prev_month) }}">{{ t('lb_prev') }}</a>
+        {% if next_month %} &nbsp;|&nbsp; <a href="{{ url_for('leaderboard', month=next_month) }}">{{ t('lb_next') }}</a>{% endif %}
+      </p>
     </div>
 
     <div class="card" style="padding:8px 8px 20px;">

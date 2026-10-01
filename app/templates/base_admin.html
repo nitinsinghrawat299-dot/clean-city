@@ -40,9 +40,7 @@
       <a href="{{ url_for('admin_feedback') }}" class="{{ 'active' if request.endpoint == 'admin_feedback' }}">⭐ Feedback</a>
       <a href="{{ url_for('admin_users') }}" class="{{ 'active' if request.endpoint == 'admin_users' }}">{{ t('admin_citizens') }}</a>
       <a href="{{ url_for('leaderboard') }}">{{ t('admin_leaderboard') }}</a>
-      <a href="{{ url_for('admin_export_pdf') }}">📄 Export Data (PDF)</a>
     </nav>
-    <a href="{{ url_for('admin_reset_database') }}" class="btn btn-block btn-sm" style="margin-bottom:8px; color:var(--red-soft); border:1px solid rgba(217,45,45,.35); background:rgba(217,45,45,.06);">🗑️ Reset Database</a>
     <a href="{{ url_for('set_language', lang='hi' if get_lang()=='en' else 'en') }}" class="btn btn-ghost btn-block btn-sm" style="margin-bottom:8px;">🌐 {{ t('lang_toggle') }}</a>
     <a href="{{ url_for('logout') }}" class="btn btn-ghost btn-block btn-sm">{{ t('nav_logout') }}</a>
   </aside>

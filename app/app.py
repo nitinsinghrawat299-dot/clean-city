@@ -1,25 +1,14 @@
-import os, uuid, json, datetime, io, re, urllib.request
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import os, uuid, json, datetime, re, threading
 import firebase_admin
 from firebase_admin import credentials, firestore
 import cloudinary, cloudinary.uploader
-from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
+from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
 from flask_wtf import CSRFProtect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from translations import TRANSLATIONS
-from PIL import Image as PILImage
-from xml.sax.saxutils import escape as _xml_escape
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.units import mm
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib import colors
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
-                                 Image as RLImage, PageBreak, HRFlowable)
 
 load_dotenv(); BASE=os.path.dirname(os.path.abspath(__file__))
 app=Flask(__name__); app.secret_key=os.getenv('SECRET_KEY','clean-city-local-secret-change-me')
@@ -171,174 +160,6 @@ def category_label(cat_key,sub_key):
  if not sub: return cat['icon']+' '+t('cat_'+cat_key)
  return cat['icon']+' '+t('sub_'+sub_key)
 
-# ---- PDF data export ----
-# Tries to find a Devanagari-capable font already installed on the server so Hindi
-# text renders properly; if none is found, Hindi runs are swapped for a plain-English
-# placeholder instead of printing garbled boxes (base PDF fonts can't show those glyphs).
-PDF_FONT_REGULAR='Helvetica'; PDF_FONT_BOLD='Helvetica-Bold'; _PDF_HAS_DEVANAGARI=False
-for _p in (
- '/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf',
- '/usr/share/fonts/opentype/noto/NotoSansDevanagari-Regular.ttf',
- '/usr/share/fonts/truetype/lohit-devanagari/Lohit-Devanagari.ttf',
- os.path.join(BASE,'static','fonts','NotoSansDevanagari-Regular.ttf'),
-):
- if os.path.isfile(_p):
-  try:
-   pdfmetrics.registerFont(TTFont('PDFDevanagari',_p))
-   PDF_FONT_REGULAR=PDF_FONT_BOLD='PDFDevanagari'; _PDF_HAS_DEVANAGARI=True; break
-  except Exception: pass
-_DEVANAGARI_RE=re.compile('[\u0900-\u097F]')
-def _pdf_text(s):
- s=str(s or '')
- if _PDF_HAS_DEVANAGARI or not _DEVANAGARI_RE.search(s): return s
- stripped=_DEVANAGARI_RE.sub('',s).strip(' -:,.')
- return stripped if stripped else '[Hindi text - view on the live site]'
-def _pdf_esc(s): return _xml_escape(_pdf_text(s))
-def _fetch_image_bytes(url):
- if not url: return None
- try:
-  req=urllib.request.Request(url, headers={'User-Agent':'Mozilla/5.0'})
-  with urllib.request.urlopen(req, timeout=5) as resp: return resp.read()
- except Exception: return None
-def _fetch_images_concurrently(urls, max_workers=12):
- # Network fetches are the slow part of building this PDF (gunicorn's default
- # request timeout is 30s, and this export can be killed mid-request on Render's
- # free tier if 100+ images are fetched one at a time). Fetching them in parallel
- # on a thread pool cuts wall-clock time roughly max_workers-fold, since each
- # fetch is pure I/O wait, not CPU work.
- out={}
- urls=[u for u in dict.fromkeys(urls) if u]  # de-dupe, preserve order, drop falsy
- if not urls: return out
- with ThreadPoolExecutor(max_workers=min(max_workers,len(urls))) as ex:
-  futures={ex.submit(_fetch_image_bytes,u):u for u in urls}
-  for fut in as_completed(futures):
-   u=futures[fut]
-   try: out[u]=fut.result()
-   except Exception: out[u]=None
- return out
-def _pdf_image_flowable(raw_bytes, max_w_mm=80, max_h_mm=60):
- try:
-  img=PILImage.open(io.BytesIO(raw_bytes)).convert('RGB')
-  buf=io.BytesIO(); img.save(buf, format='JPEG', quality=75); buf.seek(0)
-  w,h=img.size; scale=min(max_w_mm*mm/w, max_h_mm*mm/h)
-  return RLImage(buf, width=w*scale, height=h*scale)
- except Exception: return None
-
-def generate_data_export_pdf(users, comps, image_cap=60):
- buf=io.BytesIO()
- doc=SimpleDocTemplate(buf, pagesize=A4, topMargin=16*mm, bottomMargin=16*mm, leftMargin=16*mm, rightMargin=16*mm)
- styles=getSampleStyleSheet()
- h1=ParagraphStyle('h1x',parent=styles['Heading1'],fontName=PDF_FONT_BOLD,fontSize=16)
- h2=ParagraphStyle('h2x',parent=styles['Heading2'],fontName=PDF_FONT_BOLD,fontSize=12,spaceBefore=10)
- normal=ParagraphStyle('normalx',parent=styles['Normal'],fontName=PDF_FONT_REGULAR,fontSize=9,leading=12)
- small=ParagraphStyle('smallx',parent=styles['Normal'],fontName=PDF_FONT_REGULAR,fontSize=8,textColor=colors.grey,leading=10)
- cell=ParagraphStyle('cellx',parent=normal,fontSize=8,leading=10)
-
- story=[Paragraph('Clean City (SPR) &mdash; Full Data Export',h1),
-        Paragraph('Pauri Nagar Palika Parishad &mdash; Government of Uttarakhand',normal),
-        Paragraph('Generated '+now_iso()[:16].replace('T',' ')+' UTC',small), Spacer(1,10)]
-
- resolved=[c for c in comps if c.get('status')=='Resolved']
- denied=[c for c in comps if c.get('status')=='Denied']
- pending=len(comps)-len(resolved)-len(denied)
- rated=[c for c in resolved if c.get('rating')]
- avg_rating=round(sum(c['rating'] for c in rated)/len(rated),1) if rated else 0
-
- story.append(Paragraph('Summary',h2))
- rows=[['Total reports',str(len(comps))],['Resolved',str(len(resolved))],
-       ['Pending / In Progress',str(pending)],['Denied',str(len(denied))],
-       ['Registered citizens',str(len(users))],
-       ['Total points awarded',str(sum(u.get('points',0) for u in users))],
-       ['Average citizen rating', f'{avg_rating}/5' if rated else '\u2014']]
- t1=Table(rows,colWidths=[70*mm,40*mm])
- t1.setStyle(TableStyle([('FONTNAME',(0,0),(-1,-1),PDF_FONT_REGULAR),('FONTSIZE',(0,0),(-1,-1),9),
-  ('BOTTOMPADDING',(0,0),(-1,-1),4),('TOPPADDING',(0,0),(-1,-1),4),
-  ('LINEBELOW',(0,0),(-1,-2),0.4,colors.HexColor('#e2e2e2')),('FONTNAME',(0,0),(0,-1),PDF_FONT_BOLD)]))
- story+=[t1,Spacer(1,14),Paragraph(f'Registered Citizens ({len(users)})',h2)]
-
- if users:
-  urows=[['Username','Email','Points','Joined']]
-  for u in sorted(users,key=lambda x:(x.get('username') or '').lower()):
-   urows.append([Paragraph(_pdf_esc(u.get('username','\u2014')),cell),Paragraph(_pdf_esc(u.get('email','\u2014')),cell),
-                 str(u.get('points',0)),Paragraph(_pdf_esc((u.get('created_at') or '')[:10] or '\u2014'),cell)])
-  ut=Table(urows,colWidths=[38*mm,62*mm,20*mm,30*mm],repeatRows=1)
-  ut.setStyle(TableStyle([('FONTNAME',(0,0),(-1,0),PDF_FONT_BOLD),('FONTNAME',(0,1),(-1,-1),PDF_FONT_REGULAR),
-   ('FONTSIZE',(0,0),(-1,-1),8),('BACKGROUND',(0,0),(-1,0),colors.HexColor('#eef6ef')),
-   ('GRID',(0,0),(-1,-1),0.3,colors.HexColor('#dddddd')),('TOPPADDING',(0,0),(-1,-1),3),('BOTTOMPADDING',(0,0),(-1,-1),3)]))
-  story.append(ut)
- else:
-  story.append(Paragraph('No registered citizens yet.',normal))
- story.append(PageBreak())
-
- story.append(Paragraph(f'Reports ({len(comps)})',h2))
- if len(comps)>image_cap:
-  story.append(Paragraph(f'(Photos are embedded for the {image_cap} most recent reports only, to keep this export fast and a reasonable size. Older reports still list all their text details below.)',small))
- story.append(Spacer(1,4))
-
- comps_sorted=sorted(comps,key=lambda x:x.get('report_number') or 0,reverse=True)
-
- # ---- Phase 1: decide which photos to embed, then fetch them ALL concurrently ----
- # (not one-by-one as the PDF is built) so this request finishes well inside
- # gunicorn's request timeout even with dozens of reports.
- to_fetch=[]
- budget=image_cap
- for c in comps_sorted:
-  if budget<=0: break
-  if c.get('image') and c.get('media_type')!='video':
-   to_fetch.append(c['image']); budget-=1
-  if budget<=0: break
-  if c.get('resolution_photo'):
-   to_fetch.append(c['resolution_photo']); budget-=1
- image_bytes=_fetch_images_concurrently(to_fetch)
-
- # ---- Phase 2: build the PDF from the already-fetched bytes (no network calls here) ----
- embedded=0
- for c in comps_sorted:
-  block=[]
-  title=f"#{c.get('report_number','\u2014')} \u2014 {category_label(c.get('category',''),c.get('subcategory',''))} \u2014 {c.get('status','\u2014')}"
-  block.append(Paragraph(_pdf_esc(title),ParagraphStyle('tt',parent=normal,fontName=PDF_FONT_BOLD,fontSize=10)))
-  block.append(Paragraph(f"By {_pdf_esc(c.get('citizen_username','\u2014'))} &middot; Reported {_pdf_esc((c.get('created_at') or '\u2014')[:16].replace('T',' '))}",small))
-  if c.get('description'): block.append(Paragraph('<b>Description:</b> '+_pdf_esc(c['description']),normal))
-  loc=c.get('address') or c.get('location') or c.get('coordinates') or '\u2014'
-  block.append(Paragraph('<b>Location:</b> '+_pdf_esc(loc),normal))
-  if c.get('status')=='Denied' and c.get('denial_reason'):
-   block.append(Paragraph('<b>Denial reason:</b> '+_pdf_esc(c['denial_reason']),normal))
-  if c.get('resolution_note'): block.append(Paragraph('<b>Resolution note:</b> '+_pdf_esc(c['resolution_note']),normal))
-  if c.get('rating'):
-   cmt=f' \u2014 "{_pdf_esc(c["rating_comment"])}"' if c.get('rating_comment') else ''
-   block.append(Paragraph(f"<b>Citizen rating:</b> {c['rating']}/5{cmt}",normal))
-
-  img_cells=[]
-  if c.get('media_type')=='video' and c.get('image'):
-   safe_url=_xml_escape(c['image'])
-   block.append(Paragraph(f'<b>Video attachment (not embeddable in PDF):</b> <link href="{safe_url}">{safe_url}</link>',normal))
-  elif c.get('image') and c['image'] in image_bytes:
-   raw=image_bytes.get(c['image'])
-   fl=_pdf_image_flowable(raw) if raw else None
-   if fl: img_cells.append([Paragraph('Reported photo',small),fl]); embedded+=1
-  if c.get('audio'):
-   safe_url=_xml_escape(c['audio'])
-   block.append(Paragraph(f'<b>Voice note:</b> <link href="{safe_url}">{safe_url}</link>',normal))
-  if c.get('resolution_photo') and c['resolution_photo'] in image_bytes:
-   raw=image_bytes.get(c['resolution_photo'])
-   fl=_pdf_image_flowable(raw) if raw else None
-   if fl: img_cells.append([Paragraph('Resolution photo',small),fl]); embedded+=1
-
-  if img_cells:
-   if len(img_cells)==2:
-    tbl=Table([[img_cells[0][0],img_cells[1][0]],[img_cells[0][1],img_cells[1][1]]],colWidths=[85*mm,85*mm])
-   else:
-    tbl=Table([[img_cells[0][0]],[img_cells[0][1]]],colWidths=[85*mm])
-   tbl.setStyle(TableStyle([('VALIGN',(0,0),(-1,-1),'TOP')]))
-   block+=[Spacer(1,4),tbl]
-
-  block+=[Spacer(1,4),HRFlowable(width='100%',thickness=0.4,color=colors.HexColor('#dddddd')),Spacer(1,8)]
-  story.extend(block)
-
- doc.build(story)
- buf.seek(0)
- return buf
-
 # ---- Citizen Cleanliness Survey ----
 SURVEY_QUESTIONS=[
  {'id':'q1','text':'Is waste collected from your household/shop on a daily basis?','options':[
@@ -383,6 +204,63 @@ def _doc(snap):
 def _count(query):
  return query.count().get()[0][0].value
 def now_iso(): return datetime.datetime.utcnow().isoformat()
+
+# ---- India time helpers (day / month boundaries follow IST; timestamps are stored in UTC) ----
+IST_OFFSET=datetime.timedelta(hours=5,minutes=30)
+def ist_now(): return datetime.datetime.utcnow()+IST_OFFSET
+def ist_day_start_utc_iso():
+ n=ist_now().replace(hour=0,minute=0,second=0,microsecond=0)
+ return (n-IST_OFFSET).isoformat()
+def month_bounds_utc(ym):
+ # 'YYYY-MM' (IST month) -> (start, end) as UTC ISO strings, end exclusive
+ y,m=map(int,ym.split('-')); ny,nm=(y+1,1) if m==12 else (y,m+1)
+ return (datetime.datetime(y,m,1)-IST_OFFSET).isoformat(),(datetime.datetime(ny,nm,1)-IST_OFFSET).isoformat()
+def shift_month(ym,delta):
+ y,m=map(int,ym.split('-')); i=y*12+(m-1)+delta; return '%04d-%02d'%(i//12,i%12+1)
+
+# ---- Daily report limit ----
+DAILY_REPORT_LIMIT=3
+def reports_today(citizen_id):
+ start=ist_day_start_utc_iso()
+ # single-field query + Python filter, so no composite Firestore index is needed
+ return sum(1 for d in db.collection('complaints').where('citizen_id','==',citizen_id).select(['created_at']).stream()
+            if ((d.to_dict() or {}).get('created_at') or '')>=start)
+def daily_limit_reached(citizen_id): return reports_today(citizen_id)>=DAILY_REPORT_LIMIT
+
+# ---- Monthly reset ----
+# On the first request of each new month (IST) the app clears the previous month's
+# *unresolved* reports and the visit log. Resolved reports, feedback, surveys and citizen
+# accounts are never touched. The leaderboard needs no clearing: it is computed per month
+# from resolved reports. Set MONTHLY_RESET=0 to switch the clean-up off.
+MONTHLY_RESET_ENABLED=os.getenv('MONTHLY_RESET','1')!='0'
+_reset_checked_month=None
+def _delete_refs(refs,batch_size=400):
+ for i in range(0,len(refs),batch_size):
+  batch=db.batch()
+  for r in refs[i:i+batch_size]: batch.delete(r)
+  batch.commit()
+def _monthly_cleanup(cutoff):
+ try:
+  old=[d for d in db.collection('complaints').where('created_at','<',cutoff).stream()]
+  _delete_refs([d.reference for d in old if (d.to_dict() or {}).get('status')!='Resolved'])
+  _delete_refs([d.reference for d in db.collection('visits').where('created_at','<',cutoff).stream()])
+ except Exception as e:
+  print('Monthly cleanup failed:',e)
+@firestore.transactional
+def _claim_month(tx,ref,month):
+ snap=ref.get(transaction=tx); last=(snap.to_dict() or {}).get('last_month') if snap.exists else None
+ if last==month: return 'done'
+ tx.set(ref,{'last_month':month,'updated_at':now_iso()})
+ return 'init' if last is None else 'run'   # first ever run only records the month; nothing is deleted
+def run_monthly_reset_if_due():
+ global _reset_checked_month
+ if not MONTHLY_RESET_ENABLED: return
+ month=ist_now().strftime('%Y-%m')
+ if _reset_checked_month==month: return
+ try: result=_claim_month(db.transaction(),db.collection('meta').document('monthly_reset'),month)
+ except Exception: return  # try again on a later request
+ _reset_checked_month=month
+ if result=='run': threading.Thread(target=_monthly_cleanup,args=(month_bounds_utc(month)[0],),daemon=True).start()
 def badge(points):
  return ('🌱','Green Starter') if points<20 else ('🌿','Eco Hero') if points<50 else ('🏆','Clean City Champion')
 def allowed(n): return '.' in n and n.rsplit('.',1)[1].lower() in ALLOWED
@@ -421,6 +299,7 @@ def no_cache_html(resp):
 @app.before_request
 def track_visit():
  if request.endpoint=='static' or request.path.startswith('/static'): return
+ run_monthly_reset_if_due()
  if session.get('admin_logged_in'): return  # don't count the admin's own browsing
  if not session.get('_visited'):
   db.collection('visits').document(uuid.uuid4().hex).set({'created_at':now_iso()})
@@ -464,6 +343,7 @@ def report_subcategory(cat_key,sub_key):
  cat=CATEGORIES.get(cat_key)
  sub=cat['subcats'].get(sub_key) if cat else None
  if not cat or not sub: return redirect(url_for('home'))
+ if daily_limit_reached(session['citizen_id']): flash(t('daily_limit_reached')); return redirect(url_for('home'))
  if not sub['enabled']: return render_template('report_unavailable.html',cat_key=cat_key,sub_key=sub_key,category=cat,subcategory=sub)
  if sub.get('media_type')=='photo_video_voice': return render_template('report_form_media.html',cat_key=cat_key,sub_key=sub_key,category=cat,subcategory=sub)
  return render_template('report_form.html',cat_key=cat_key,sub_key=sub_key,category=cat,subcategory=sub)
@@ -520,11 +400,24 @@ def delete_account():
  return redirect(url_for('citizen_login'))
 @app.route('/leaderboard')
 def leaderboard():
+ # Monthly leaderboard: points earned from reports resolved in the chosen (IST) month.
+ cur=ist_now().strftime('%Y-%m'); month=request.args.get('month','')
+ if not re.fullmatch(r'\d{4}-(0[1-9]|1[0-2])',month) or month>cur: month=cur
+ start,end=month_bounds_utc(month); totals={}
+ for d in db.collection('complaints').where('status','==','Resolved').stream():
+  c=d.to_dict() or {}; ra=c.get('resolved_at') or ''
+  pts=c.get('points_awarded') or 0; cid=c.get('citizen_id')
+  if not cid or pts<=0 or not (start<=ra<end): continue
+  e=totals.setdefault(cid,{'username':c.get('citizen_username',''),'points':0}); e['points']+=pts
+ top=sorted(totals.items(),key=lambda kv:-kv[1]['points'])[:20]
+ lifetime={s.id:(s.to_dict() or {}).get('points',0) for s in db.get_all([db.collection('users').document(cid) for cid,_ in top]) if s.exists} if top else {}
  data=[]
- docs=db.collection('users').order_by('points',direction=firestore.Query.DESCENDING).limit(20).stream()
- for i,u in enumerate(docs,1):
-  ud=u.to_dict() or {}; ic,b=badge(ud.get('points',0)); data.append({'rank':i,'username':ud.get('username',''),'points':ud.get('points',0),'icon':ic,'badge':b})
- return render_template('leaderboard.html',users=data)
+ for cid,e in top:
+  if cid not in lifetime: continue  # account was deleted
+  ic,b=badge(lifetime[cid]); data.append({'rank':len(data)+1,'username':e['username'],'points':e['points'],'icon':ic,'badge':b})
+ y,m=map(int,month.split('-'))
+ return render_template('leaderboard.html',users=data,month_label=datetime.date(y,m,1).strftime('%B %Y'),
+  prev_month=shift_month(month,-1),next_month=shift_month(month,1) if month<cur else None)
 @app.route('/survey',methods=['GET','POST'])
 def survey():
  if not session.get('citizen_id'): return redirect(url_for('citizen_login'))
@@ -563,6 +456,7 @@ def feedback_form():
 @app.route('/submit',methods=['POST'])
 def submit():
  if not session.get('citizen_id'): return redirect(url_for('citizen_login'))
+ if daily_limit_reached(session['citizen_id']): flash(t('daily_limit_reached')); return redirect(url_for('home'))
  cat_key=request.form.get('category',''); sub_key=request.form.get('subcategory','')
  cat=CATEGORIES.get(cat_key); sub=cat['subcats'].get(sub_key) if cat else None
  if not cat or not sub or not sub['enabled']: flash('Please choose a valid, available complaint type.'); return redirect(url_for('home'))
@@ -723,43 +617,6 @@ def admin_map():
  denied=sum(1 for p in pins if p['status']=='Denied')
  pending=len(pins)-resolved-denied
  return render_template('admin_map.html',pins=pins,rng=rng,total=len(pins),resolved=resolved,pending=pending,denied=denied)
-@app.route('/admin/export-pdf')
-def admin_export_pdf():
- if not session.get('admin_logged_in'): return redirect(url_for('login'))
- users=[_doc(d) for d in db.collection('users').stream()]
- comps=[_doc(d) for d in db.collection('complaints').stream()]
- pdf_buf=generate_data_export_pdf(users,comps)
- filename='clean-city-export-'+datetime.datetime.utcnow().strftime('%Y%m%d-%H%M')+'.pdf'
- return send_file(pdf_buf,mimetype='application/pdf',as_attachment=True,download_name=filename)
-
-def _delete_collection(coll_ref,batch_size=400):
- docs=list(coll_ref.limit(batch_size).stream())
- deleted=0
- while docs:
-  batch=db.batch()
-  for d in docs: batch.delete(d.reference)
-  batch.commit(); deleted+=len(docs)
-  docs=list(coll_ref.limit(batch_size).stream())
- return deleted
-
-@app.route('/admin/reset-database',methods=['GET','POST'])
-@limiter.limit('5 per hour',methods=['POST'])
-def admin_reset_database():
- if not session.get('admin_logged_in'): return redirect(url_for('login'))
- if request.method=='POST':
-  pw=request.form.get('password','')
-  confirm=request.form.get('confirm_text','').strip()
-  if confirm!='RESET':
-   flash('Please type RESET exactly to confirm.'); return redirect(url_for('admin_reset_database'))
-  if not ADMIN_PASSWORD_HASH or not check_password_hash(ADMIN_PASSWORD_HASH,pw):
-   flash('Incorrect password — database was not touched.'); return redirect(url_for('admin_reset_database'))
-  for name in ('complaints','users','surveys','feedback','visits'):
-   _delete_collection(db.collection(name))
-  session.clear(); session['admin_logged_in']=True  # keep the admin signed in; every citizen session is now invalid
-  flash('✅ Database has been reset. All reports, citizen accounts, survey responses and feedback were deleted.')
-  return redirect(url_for('admin'))
- return render_template('admin_reset_confirm.html')
-
 @app.route('/update/<complaint_id>',methods=['POST'])
 def update_status(complaint_id):
  if not session.get('admin_logged_in'): return redirect(url_for('login'))
