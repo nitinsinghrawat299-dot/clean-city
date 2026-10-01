@@ -7,11 +7,18 @@
     <h1>{{ t('admin_reports') }}</h1>
     <p>{{ t('choose_category') }}</p>
   </div>
+  <form method="GET" action="{{ url_for('admin') }}" style="display:flex; gap:8px; align-items:center;">
+    <label for="monthSelect" style="font-weight:600;">{{ t('month_label') }}</label>
+    <select id="monthSelect" name="month" class="search-input" style="min-width:160px;" onchange="this.form.submit()">
+      {% for m in month_options %}<option value="{{ m.value }}" {{ 'selected' if m.value == month }}>{{ m.label }}</option>{% endfor %}
+    </select>
+  </form>
 </div>
+<p style="margin:0 0 16px; color:var(--text-muted);">{{ t('showing_month') }} <strong>{{ month_label }}</strong> · {{ month_total }} {{ t('total_reports_stat') }}</p>
 
 <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:20px;">
   {% for tile in tiles %}
-    <a href="{{ url_for('admin_reports', cat_key=tile.cat_key) }}" class="card" style="display:block; position:relative; text-decoration:none; color:inherit;">
+    <a href="{{ url_for('admin_reports', cat_key=tile.cat_key, month=month) }}" class="card" style="display:block; position:relative; text-decoration:none; color:inherit;">
       {% if tile.pending > 0 %}
         <span class="cat-badge">{{ tile.pending }}</span>
       {% endif %}
@@ -22,7 +29,7 @@
   {% endfor %}
 
   {% if total_uncategorized > 0 %}
-    <a href="{{ url_for('admin_reports', cat_key='uncategorized') }}" class="card" style="display:block; position:relative; text-decoration:none; color:inherit;">
+    <a href="{{ url_for('admin_reports', cat_key='uncategorized', month=month) }}" class="card" style="display:block; position:relative; text-decoration:none; color:inherit;">
       {% if uncategorized_pending > 0 %}
         <span class="cat-badge">{{ uncategorized_pending }}</span>
       {% endif %}

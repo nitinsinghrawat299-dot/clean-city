@@ -218,6 +218,20 @@ def month_bounds_utc(ym):
 def shift_month(ym,delta):
  y,m=map(int,ym.split('-')); i=y*12+(m-1)+delta; return '%04d-%02d'%(i//12,i%12+1)
 
+# ---- Admin month selector ----
+def pick_month(arg):
+ cur=ist_now().strftime('%Y-%m')
+ return arg if (arg and re.fullmatch(r'\d{4}-(0[1-9]|1[0-2])',arg) and arg<=cur) else cur
+def month_of(iso):
+ # IST 'YYYY-MM' of a stored UTC ISO timestamp
+ dt=parse_dt(iso)
+ return (dt+IST_OFFSET).strftime('%Y-%m') if dt else ''
+def month_label(ym):
+ y,m=map(int,ym.split('-')); return datetime.date(y,m,1).strftime('%B %Y')
+def month_options(months):
+ cur=ist_now().strftime('%Y-%m'); allm=sorted(set(m for m in months if m)|{cur},reverse=True)
+ return [{'value':m,'label':month_label(m)} for m in allm]
+
 # ---- Daily report limit ----
 DAILY_REPORT_LIMIT=3
 def reports_today(citizen_id):
@@ -508,18 +522,18 @@ def logout(): session.pop('admin_logged_in',None); return redirect(url_for('logi
 @app.route('/admin')
 def admin():
  if not session.get('admin_logged_in'): return redirect(url_for('login'))
+ month=pick_month(request.args.get('month',''))
+ all_complaints=[d.to_dict() or {} for d in db.collection('complaints').stream()]
+ months=[month_of(c.get('created_at')) for c in all_complaints]
+ in_month=[c for c in all_complaints if month_of(c.get('created_at'))==month]
+ def pend(cs): return sum(1 for c in cs if c.get('status') not in ('Resolved','Denied'))
  tiles=[]
  for cat_key,cat in CATEGORIES.items():
-  base=db.collection('complaints').where('category','==',cat_key)
-  total=_count(base); resolved=_count(base.where('status','==','Resolved')); denied=_count(base.where('status','==','Denied'))
-  tiles.append({'cat_key':cat_key,'icon':cat['icon'],'title':t('cat_'+cat_key),'pending':total-resolved-denied})
- all_complaints=[d.to_dict() or {} for d in db.collection('complaints').stream()]
- uncategorized=[c for c in all_complaints if not c.get('category')]
- total_uncategorized=len(uncategorized)
- uncategorized_resolved=sum(1 for c in uncategorized if c.get('status')=='Resolved')
- uncategorized_denied=sum(1 for c in uncategorized if c.get('status')=='Denied')
- uncategorized_pending=total_uncategorized-uncategorized_resolved-uncategorized_denied
- return render_template('admin_categories.html',tiles=tiles,total_uncategorized=total_uncategorized,uncategorized_pending=uncategorized_pending)
+  cs=[c for c in in_month if c.get('category')==cat_key]
+  tiles.append({'cat_key':cat_key,'icon':cat['icon'],'title':t('cat_'+cat_key),'pending':pend(cs),'total':len(cs)})
+ unc=[c for c in in_month if not c.get('category')]
+ return render_template('admin_categories.html',tiles=tiles,total_uncategorized=len(unc),uncategorized_pending=pend(unc),
+  month=month,month_label=month_label(month),month_options=month_options(months),month_total=len(in_month))
 @app.route('/admin/reports/<cat_key>')
 def admin_reports(cat_key):
  if not session.get('admin_logged_in'): return redirect(url_for('login'))
@@ -532,9 +546,11 @@ def admin_reports(cat_key):
   if not cat: return redirect(url_for('admin'))
   comps=[_doc(d) for d in db.collection('complaints').where('category','==',cat_key).stream()]
   cat_title=cat['icon']+' '+t('cat_'+cat_key)
+ month=pick_month(request.args.get('month',''))
+ comps=[c for c in comps if month_of(c.get('created_at'))==month]
  for c in comps: c['created_at']=parse_dt(c.get('created_at'))
  comps.sort(key=lambda c:c['created_at'] or datetime.datetime.min,reverse=True)
- return render_template('admin.html',complaints=comps,cat_title=cat_title,cat_key=cat_key)
+ return render_template('admin.html',complaints=comps,cat_title=cat_title,cat_key=cat_key,month=month,month_label=month_label(month))
 @app.route('/admin/report/<complaint_id>')
 def admin_report_detail(complaint_id):
  if not session.get('admin_logged_in'): return redirect(url_for('login'))
@@ -543,7 +559,8 @@ def admin_report_detail(complaint_id):
  c['created_at']=parse_dt(c.get('created_at'))
  citizen=_doc(db.collection('users').document(c['citizen_id']).get()) if c.get('citizen_id') else None
  from_cat=request.args.get('from_cat','')
- back_url=url_for('admin_reports',cat_key=from_cat) if from_cat else url_for('admin')
+ month=pick_month(request.args.get('month',''))
+ back_url=url_for('admin_reports',cat_key=from_cat,month=month) if from_cat else url_for('admin',month=month)
  subcategory=(CATEGORIES.get(c.get('category'),{}).get('subcats',{}) or {}).get(c.get('subcategory'))
  return render_template('admin_report_detail.html',c=c,citizen=citizen,back_url=back_url,subcategory=subcategory)
 @app.route('/admin/users')
@@ -620,7 +637,7 @@ def admin_map():
 @app.route('/update/<complaint_id>',methods=['POST'])
 def update_status(complaint_id):
  if not session.get('admin_logged_in'): return redirect(url_for('login'))
- s=request.form.get('status','Reported'); r=request.form.get('reason','').strip(); cat_key=request.form.get('cat_key','')
+ s=request.form.get('status','Reported'); r=request.form.get('reason','').strip(); cat_key=request.form.get('cat_key',''); month=pick_month(request.form.get('month',''))
  ref=db.collection('complaints').document(complaint_id); c=_doc(ref.get())
  if c and s=='Resolved' and c.get('status')!='Resolved':
   sub=(CATEGORIES.get(c.get('category'),{}).get('subcats',{}) or {}).get(c.get('subcategory'),{})
@@ -632,11 +649,11 @@ def update_status(complaint_id):
   if photo_required:
    if not (photo and photo.filename and allowed(photo.filename)):
     flash('Please attach a photo showing the issue has been resolved before marking this report Resolved.')
-    return redirect(url_for('admin_report_detail',complaint_id=complaint_id,from_cat=cat_key))
+    return redirect(url_for('admin_report_detail',complaint_id=complaint_id,from_cat=cat_key,month=month))
   else:
    if not note:
     flash('Please add a short note describing how this was resolved before marking this report Resolved.')
-    return redirect(url_for('admin_report_detail',complaint_id=complaint_id,from_cat=cat_key))
+    return redirect(url_for('admin_report_detail',complaint_id=complaint_id,from_cat=cat_key,month=month))
   update_data={'status':'Resolved','resolved_at':now_iso(),'resolution_note':note}
   if photo and photo.filename and allowed(photo.filename):
    update_data['resolution_photo']=save_image(photo)
@@ -647,7 +664,7 @@ def update_status(complaint_id):
   ref.update(update_data)
  elif c:
   ref.update({'status':s,'denial_reason':r if s=='Denied' else c.get('denial_reason','')})
- return redirect(url_for('admin_reports',cat_key=cat_key) if cat_key else url_for('admin'))
+ return redirect(url_for('admin_reports',cat_key=cat_key,month=month) if cat_key else url_for('admin',month=month))
 @app.route('/rate/<complaint_id>',methods=['POST'])
 def rate_complaint(complaint_id):
  if not session.get('citizen_id'): return redirect(url_for('citizen_login'))
@@ -672,8 +689,8 @@ def resolved_reports():
 @app.route('/delete/<complaint_id>',methods=['POST'])
 def delete_complaint(complaint_id):
  if not session.get('admin_logged_in'): return redirect(url_for('login'))
- cat_key=request.form.get('cat_key',''); db.collection('complaints').document(complaint_id).delete()
- return redirect(url_for('admin_reports',cat_key=cat_key) if cat_key else url_for('admin'))
+ cat_key=request.form.get('cat_key',''); month=pick_month(request.form.get('month','')); db.collection('complaints').document(complaint_id).delete()
+ return redirect(url_for('admin_reports',cat_key=cat_key,month=month) if cat_key else url_for('admin',month=month))
 @app.route('/paurigarhwal')
 def pauri_garhwal():
  return render_template('paurigarhwal.html')

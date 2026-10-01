@@ -51,6 +51,7 @@ TRANSLATIONS = {
   'lb_col_user':'User','lb_col_points':'Points','lb_you':'(you)','lb_empty':'No citizens on the leaderboard yet — be the first to report an issue!',
   'lb_pts':'pts',
   'daily_limit_reached':'You have reached today\'s limit of 3 reports. Please try again tomorrow.','lb_resets_monthly':'The leaderboard resets every month','lb_prev':'← Previous month','lb_next':'Next month →',
+  'month_label':'Month','showing_month':'Showing reports from',
 
   # ---- Report form ----
   'step_photo':'Take a Photo','step_photo_hint':'Tap below to open your camera',
@@ -215,6 +216,7 @@ TRANSLATIONS = {
   'lb_col_user':'उपयोगकर्ता','lb_col_points':'अंक','lb_you':'(आप)','lb_empty':'अभी तक लीडरबोर्ड पर कोई नागरिक नहीं है — समस्या रिपोर्ट करने वाले पहले व्यक्ति बनें!',
   'lb_pts':'अंक',
   'daily_limit_reached':'आप आज की 3 रिपोर्ट की सीमा तक पहुँच चुके हैं। कृपया कल पुनः प्रयास करें।','lb_resets_monthly':'लीडरबोर्ड हर महीने रीसेट होता है','lb_prev':'← पिछला महीना','lb_next':'अगला महीना →',
+  'month_label':'महीना','showing_month':'इस महीने की रिपोर्ट दिखाई जा रही हैं:',
 
   'step_photo':'फ़ोटो लें','step_photo_hint':'अपना कैमरा खोलने के लिए नीचे टैप करें',
   'open_camera':'📷 कैमरा खोलें','retake':'↺ फिर से लें',

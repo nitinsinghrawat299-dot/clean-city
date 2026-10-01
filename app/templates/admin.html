@@ -6,12 +6,12 @@
 {% set denied_count = complaints | selectattr('status','equalto','Denied') | list | length %}
 {% set pending_count = complaints | length - resolved_count - denied_count %}
 
-<a href="{{ url_for('admin') }}" class="btn btn-ghost btn-sm" style="margin-bottom:16px;">{{ t('back_to_categories') }}</a>
+<a href="{{ url_for('admin', month=month) }}" class="btn btn-ghost btn-sm" style="margin-bottom:16px;">{{ t('back_to_categories') }}</a>
 
 <div class="admin-topbar">
   <div>
     <h1>{{ cat_title or t('admin_reports') }}</h1>
-    <p>{{ t('view_manage') if cat_title else t('choose_category') }}</p>
+    <p>{{ t('view_manage') if cat_title else t('choose_category') }} · <strong>{{ month_label }}</strong></p>
   </div>
   <input type="text" class="search-input" id="reportSearch" placeholder="{{ t('search_reports') }}" onkeyup="filterReports()">
 </div>
@@ -42,7 +42,7 @@
         <tr>
           <td>#{{ '%03d' % c.report_number if c.report_number else c.id[:6] }}</td>
           <td>
-            <a href="{{ url_for('admin_report_detail', complaint_id=c.id, from_cat=cat_key) }}" style="display:flex; align-items:center; gap:8px; text-decoration:none; color:inherit;">
+            <a href="{{ url_for('admin_report_detail', complaint_id=c.id, from_cat=cat_key, month=month) }}" style="display:flex; align-items:center; gap:8px; text-decoration:none; color:inherit;">
               {% if c.image and c.media_type == 'video' %}
                 <video src="{{ c.image }}" class="report-thumb-sm" muted style="object-fit:cover;"></video>
               {% elif c.image %}
@@ -52,7 +52,7 @@
             </a>
           </td>
           <td style="max-width:220px;">
-            <a href="{{ url_for('admin_report_detail', complaint_id=c.id, from_cat=cat_key) }}" style="text-decoration:none; color:inherit;">
+            <a href="{{ url_for('admin_report_detail', complaint_id=c.id, from_cat=cat_key, month=month) }}" style="text-decoration:none; color:inherit;">
             {% if c.category %}<div style="font-size:.76rem; color:var(--text-muted); margin-bottom:2px;">{{ category_label(c.category, c.subcategory) }}</div>{% endif %}
             {{ c.description[:60] }}{{ '…' if c.description and c.description|length > 60 }}
             </a>
@@ -65,6 +65,7 @@
               <form method="POST" action="{{ url_for('update_status', complaint_id=c.id) }}" class="status-form" style="display:flex; gap:6px; align-items:center;">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="cat_key" value="{{ cat_key or '' }}">
+                <input type="hidden" name="month" value="{{ month }}">
                 <select name="status" class="search-input" style="min-width:120px; padding:6px 10px;" onchange="toggleReason(this)">
                   <option value="Reported" {{ 'selected' if c.status=='Reported' }}>{{ t('status_reported') }}</option>
                   <option value="In Progress" {{ 'selected' if c.status=='In Progress' }}>{{ t('status_in_progress') }}</option>
@@ -77,6 +78,7 @@
               <form method="POST" action="{{ url_for('delete_complaint', complaint_id=c.id) }}" onsubmit="return confirm('{{ t('delete_confirm') }}');">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="cat_key" value="{{ cat_key or '' }}">
+                <input type="hidden" name="month" value="{{ month }}">
                 <button type="submit" class="icon-btn danger" title="{{ t('delete_report') }}">🗑</button>
               </form>
             </div>
